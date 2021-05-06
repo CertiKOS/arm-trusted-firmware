@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef DFS_H
-#define DFS_H
-
-#include <stdint.h>
+#ifndef __SOC_ROCKCHIP_RK3399_DFS_H__
+#define __SOC_ROCKCHIP_RK3399_DFS_H__
 
 struct rk3399_sdram_default_config {
 	unsigned char bl;
@@ -47,4 +45,4 @@ void dram_dfs_init(void);
 void ddr_prepare_for_sys_suspend(void);
 void ddr_prepare_for_sys_resume(void);
 
-#endif /* DFS_H */
+#endif

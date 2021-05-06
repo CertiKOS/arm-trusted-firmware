@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PMU_COM_H
-#define PMU_COM_H
+#ifndef __PMU_COM_H__
+#define __PMU_COM_H__
 
 #ifndef CHECK_CPU_WFIE_BASE
 #define CHECK_CPU_WFIE_BASE (PMU_BASE + PMU_CORE_PWR_ST)
@@ -88,17 +88,6 @@ static int check_cpu_wfie(uint32_t cpu_id, uint32_t wfie_msk)
 		cluster_id = 0;
 	}
 
-	/*
-	 * wfe/wfi tracking not possible, hopefully the host
-	 * was sucessful in enabling wfe/wfi.
-	 * We'll give a bit of additional time, like the kernel does.
-	 */
-	if ((cluster_id && clstb_cpu_wfe < 0) ||
-	    (!cluster_id && clstl_cpu_wfe < 0)) {
-		mdelay(1);
-		return 0;
-	}
-
 	if (cluster_id)
 		wfie_msk <<= (clstb_cpu_wfe + cpu_id);
 	else
@@ -119,4 +108,4 @@ static int check_cpu_wfie(uint32_t cpu_id, uint32_t wfie_msk)
 	return 0;
 }
 
-#endif /* PMU_COM_H */
+#endif /* __PMU_COM_H__ */

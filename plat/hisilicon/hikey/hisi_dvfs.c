@@ -4,21 +4,18 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <string.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/console.h>
-#include <lib/mmio.h>
-#include <plat/common/platform.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <console.h>
+#include <debug.h>
 #include <hi6220.h>
 #include <hi6553.h>
 #include <hisi_sram_map.h>
+#include <mmio.h>
+#include <platform.h>
+#include <platform_def.h>
+#include <string.h>
 
 #define ACPU_FREQ_MAX_NUM		5
 #define	ACPU_OPP_NUM			7

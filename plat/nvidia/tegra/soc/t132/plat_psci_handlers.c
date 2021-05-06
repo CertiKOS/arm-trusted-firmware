@@ -1,24 +1,20 @@
 /*
- * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
-#include <platform_def.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
+#include <assert.h>
 #include <denver.h>
-#include <lib/mmio.h>
-#include <lib/psci/psci.h>
-
+#include <debug.h>
+#include <delay_timer.h>
 #include <flowctrl.h>
+#include <mmio.h>
+#include <platform_def.h>
 #include <pmc.h>
+#include <psci.h>
 #include <tegra_def.h>
 #include <tegra_private.h>
 
@@ -168,11 +164,6 @@ int tegra_soc_pwr_domain_suspend(const psci_power_state_t *target_state)
 	write_actlr_el1(val | target_state->pwr_domain_state[PLAT_MAX_PWR_LVL]);
 
 	return PSCI_E_SUCCESS;
-}
-
-int32_t tegra_soc_pwr_domain_suspend_pwrdown_early(const psci_power_state_t *target_state)
-{
-	return PSCI_E_NOT_SUPPORTED;
 }
 
 int tegra_soc_pwr_domain_power_down_wfi(const psci_power_state_t *target_state)

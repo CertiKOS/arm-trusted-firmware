@@ -4,22 +4,18 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/arm/cci.h>
-#include <drivers/arm/gicv2.h>
-#include <drivers/arm/pl011.h>
-#include <drivers/arm/pl061_gpio.h>
-#include <drivers/delay_timer.h>
-#include <lib/mmio.h>
-#include <lib/psci/psci.h>
-
+#include <assert.h>
+#include <cci.h>
+#include <console.h>
+#include <debug.h>
+#include <gicv2.h>
 #include <hi3660.h>
 #include <hi3660_crg.h>
-
+#include <mmio.h>
+#include <psci.h>
 #include "drivers/pwrc/hisi_pwrc.h"
+
 #include "hikey960_def.h"
 #include "hikey960_private.h"
 
@@ -33,23 +29,23 @@
 #define DMAC_GLB_REG_SEC	0x694
 #define AXI_CONF_BASE		0x820
 
-static unsigned int uart_base;
-static console_t console;
 static uintptr_t hikey960_sec_entrypoint;
 
 static void hikey960_pwr_domain_standby(plat_local_state_t cpu_state)
 {
 	unsigned long scr;
+	unsigned int val = 0;
+
+	assert(cpu_state == PLAT_MAX_RET_STATE);
 
 	scr = read_scr_el3();
 
-	/* Enable Physical IRQ and FIQ to wake the CPU */
+	/* Enable Physical IRQ and FIQ to wake the CPU*/
 	write_scr_el3(scr | SCR_IRQ_BIT | SCR_FIQ_BIT);
 
-	/* Add barrier before CPU enter WFI state */
-	isb();
-	dsb();
+	set_retention_ticks(val);
 	wfi();
+	clr_retention_ticks(val);
 
 	/*
 	 * Restore SCR to the original value, synchronisazion of
@@ -117,18 +113,8 @@ void hikey960_pwr_domain_off(const psci_power_state_t *target_state)
 	}
 }
 
-static void __dead2 hikey960_system_off(void)
-{
-	gpio_set_direction(176, GPIO_DIR_OUT);
-	gpio_set_value(176, GPIO_LEVEL_LOW);
-	panic();
-}
-
 static void __dead2 hikey960_system_reset(void)
 {
-	dsb();
-	isb();
-	mdelay(2000);
 	mmio_write_32(SCTRL_SCPEREN1_REG,
 		      SCPEREN1_WAIT_DDR_SELFREFRESH_DONE_BYPASS);
 	mmio_write_32(SCTRL_SCSYSSTAT_REG, 0xdeadbeef);
@@ -138,8 +124,8 @@ static void __dead2 hikey960_system_reset(void)
 int hikey960_validate_power_state(unsigned int power_state,
 			       psci_power_state_t *req_state)
 {
-	unsigned int pstate = psci_get_pstate_type(power_state);
-	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
+	int pstate = psci_get_pstate_type(power_state);
+	int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
 	int i;
 
 	assert(req_state);
@@ -236,7 +222,7 @@ static void hikey960_pwr_domain_suspend(const psci_power_state_t *target_state)
 			/* check the SR flag bit to determine
 			 * CLUSTER_IDLE_IPC or AP_SR_IPC to send
 			 */
-			if (hisi_test_ap_suspend_flag())
+			if (hisi_test_ap_suspend_flag(cluster))
 				hisi_enter_ap_suspend(cluster, core);
 			else
 				hisi_enter_cluster_idle(cluster, core);
@@ -264,7 +250,6 @@ static void
 hikey960_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 {
 	unsigned long mpidr = read_mpidr_el1();
-	unsigned int core = mpidr & MPIDR_CPU_MASK;
 	unsigned int cluster =
 		(mpidr & MPIDR_CLUSTER_MASK) >> MPIDR_AFFINITY_BITS;
 
@@ -272,15 +257,11 @@ hikey960_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 	if (CORE_PWR_STATE(target_state) != PLAT_MAX_OFF_STATE)
 		return;
 
-	hisi_cpuidle_lock(cluster, core);
-	hisi_clear_cpuidle_flag(cluster, core);
-	hisi_cpuidle_unlock(cluster, core);
-
-	if (hisi_test_ap_suspend_flag()) {
+	if (hisi_test_ap_suspend_flag(cluster)) {
 		hikey960_sr_dma_reinit();
 		gicv2_cpuif_enable();
-		console_pl011_register(uart_base, PL011_UART_CLK_IN_HZ,
-				       PL011_BAUDRATE, &console);
+		console_init(PL011_UART6_BASE, PL011_UART_CLK_IN_HZ,
+			     PL011_BAUDRATE);
 	}
 
 	hikey960_pwr_domain_on_finish(target_state);
@@ -301,7 +282,7 @@ static const plat_psci_ops_t hikey960_psci_ops = {
 	.pwr_domain_off			= hikey960_pwr_domain_off,
 	.pwr_domain_suspend		= hikey960_pwr_domain_suspend,
 	.pwr_domain_suspend_finish	= hikey960_pwr_domain_suspend_finish,
-	.system_off			= hikey960_system_off,
+	.system_off			= NULL,
 	.system_reset			= hikey960_system_reset,
 	.validate_power_state		= hikey960_validate_power_state,
 	.validate_ns_entrypoint		= hikey960_validate_ns_entrypoint,
@@ -311,19 +292,6 @@ static const plat_psci_ops_t hikey960_psci_ops = {
 int plat_setup_psci_ops(uintptr_t sec_entrypoint,
 			const plat_psci_ops_t **psci_ops)
 {
-	unsigned int id = 0;
-	int ret;
-
-	ret = hikey960_read_boardid(&id);
-	if (ret == 0) {
-		if (id == 5300U)
-			uart_base = PL011_UART5_BASE;
-		else
-			uart_base = PL011_UART6_BASE;
-	} else {
-		uart_base = PL011_UART6_BASE;
-	}
-
 	hikey960_sec_entrypoint = sec_entrypoint;
 
 	INFO("%s: sec_entrypoint=0x%lx\n", __func__,

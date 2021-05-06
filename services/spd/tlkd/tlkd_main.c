@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,21 +13,19 @@
  * handle the request locally or delegate it to the Secure Payload. It is also
  * responsible for initialising and maintaining communication with the SP.
  ******************************************************************************/
-#include <assert.h>
-#include <bl31/interrupt_mgmt.h>
-#include <errno.h>
-#include <stddef.h>
-
 #include <arch_helpers.h>
-#include <bl31/bl31.h>
-#include <bl32/payloads/tlk.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <plat/common/platform.h>
-#include <tools_share/uuid.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <bl31.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <errno.h>
+#include <interrupt_mgmt.h>
+#include <platform.h>
+#include <runtime_svc.h>
+#include <stddef.h>
+#include <tlk.h>
+#include <uuid.h>
 #include "tlkd_private.h"
 
 extern const spd_pm_ops_t tlkd_pm_ops;
@@ -44,11 +41,11 @@ tlk_context_t tlk_ctx;
 static uint32_t boot_cpu;
 
 /* TLK UID: RFC-4122 compliant UUID (version-5, sha-1) */
-DEFINE_SVC_UUID2(tlk_uuid,
-	0xc9e911bd, 0xba2b, 0xee52, 0xb1, 0x72,
-	0x46, 0x1f, 0xba, 0x97, 0x7f, 0x63);
+DEFINE_SVC_UUID(tlk_uuid,
+		0xbd11e9c9, 0x2bba, 0x52ee, 0xb1, 0x72,
+		0x46, 0x1f, 0xba, 0x97, 0x7f, 0x63);
 
-static int32_t tlkd_init(void);
+int32_t tlkd_init(void);
 
 /*******************************************************************************
  * Secure Payload Dispatcher's timer interrupt handler
@@ -99,7 +96,7 @@ static uint64_t tlkd_interrupt_handler(uint32_t id,
  * (aarch32/aarch64) if not already known and initialises the context for entry
  * into the SP for its initialisation.
  ******************************************************************************/
-static int32_t tlkd_setup(void)
+int32_t tlkd_setup(void)
 {
 	entry_point_info_t *tlk_ep_info;
 	uint32_t flags;
@@ -134,6 +131,12 @@ static int32_t tlkd_setup(void)
 		tlk_ep_info->pc,
 		&tlk_ctx);
 
+	/*
+	 * All TLK SPD initialization done. Now register our init function
+	 * with BL31 for deferred invocation
+	 */
+	bl31_register_bl32_init(&tlkd_init);
+
 	/* get a list of all S-EL1 IRQs from the platform */
 
 	/* register interrupt handler */
@@ -146,12 +149,6 @@ static int32_t tlkd_setup(void)
 		ERROR("failed to register tlkd interrupt handler (%d)\n", ret);
 	}
 
-	/*
-	 * All TLK SPD initialization done. Now register our init function
-	 * with BL31 for deferred invocation
-	 */
-	bl31_register_bl32_init(&tlkd_init);
-
 	return 0;
 }
 
@@ -162,7 +159,7 @@ static int32_t tlkd_setup(void)
  * used. This function performs a synchronous entry into the Secure payload.
  * The SP passes control back to this routine through a SMC.
  ******************************************************************************/
-static int32_t tlkd_init(void)
+int32_t tlkd_init(void)
 {
 	entry_point_info_t *tlk_entry_point;
 
@@ -195,14 +192,14 @@ static int32_t tlkd_init(void)
  * will also return any information that the secure payload needs to do the
  * work assigned to it.
  ******************************************************************************/
-static uintptr_t tlkd_smc_handler(uint32_t smc_fid,
-			 u_register_t x1,
-			 u_register_t x2,
-			 u_register_t x3,
-			 u_register_t x4,
+uint64_t tlkd_smc_handler(uint32_t smc_fid,
+			 uint64_t x1,
+			 uint64_t x2,
+			 uint64_t x3,
+			 uint64_t x4,
 			 void *cookie,
 			 void *handle,
-			 u_register_t flags)
+			 uint64_t flags)
 {
 	cpu_context_t *ns_cpu_context;
 	gp_regs_t *gp_regs;
@@ -408,7 +405,7 @@ static uintptr_t tlkd_smc_handler(uint32_t smc_fid,
 
 		/*
 		 * SP has been successfully initialized. Register power
-		 * management hooks with PSCI
+		 * managemnt hooks with PSCI
 		 */
 		psci_register_spd_pm_hook(&tlkd_pm_ops);
 
@@ -419,7 +416,6 @@ static uintptr_t tlkd_smc_handler(uint32_t smc_fid,
 		 * context.
 		 */
 		tlkd_synchronous_sp_exit(&tlk_ctx, x1);
-		break;
 
 	/*
 	 * These function IDs are used only by TLK to indicate it has
@@ -444,7 +440,6 @@ static uintptr_t tlkd_smc_handler(uint32_t smc_fid,
 		 * return value to the caller
 		 */
 		tlkd_synchronous_sp_exit(&tlk_ctx, x1);
-		break;
 
 	/*
 	 * This function ID is used by SP to indicate that it has completed

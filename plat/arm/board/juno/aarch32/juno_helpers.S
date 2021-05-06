@@ -6,12 +6,13 @@
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <common/bl_common.h>
+#include <bl_common.h>
 #include <cortex_a53.h>
 #include <cortex_a57.h>
 #include <cortex_a72.h>
-#include <cpu_macros.S>
-#include <platform_def.h>
+#include <v2m_def.h>
+#include "../juno_def.h"
+
 
 	.globl	plat_reset_handler
 	.globl	plat_arm_calc_core_pos
@@ -30,6 +31,21 @@
 	.macro jump_to_handler _revision, _handler
 	cmp	r0, #\_revision
 	beq	\_handler
+	.endm
+
+	/* --------------------------------------------------------------------
+	 * Helper macro that reads the part number of the current CPU and jumps
+	 * to the given label if it matches the CPU MIDR provided.
+	 *
+	 * Clobbers r0.
+	 * --------------------------------------------------------------------
+	 */
+	.macro  jump_if_cpu_midr _cpu_midr, _label
+	ldcopr	r0, MIDR
+	ubfx	r0, r0, #MIDR_PN_SHIFT, #12
+	ldr	r1, =((\_cpu_midr >> MIDR_PN_SHIFT) & MIDR_PN_MASK)
+	cmp	r0, r1
+	beq	\_label
 	.endm
 
 	/* --------------------------------------------------------------------

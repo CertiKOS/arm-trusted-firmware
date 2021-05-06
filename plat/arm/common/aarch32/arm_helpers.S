@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -48,7 +48,7 @@ func plat_crash_console_init
 	ldr	r0, =PLAT_ARM_CRASH_UART_BASE
 	ldr	r1, =PLAT_ARM_CRASH_UART_CLK_IN_HZ
 	ldr	r2, =ARM_CONSOLE_BAUDRATE
-	b	console_pl011_core_init
+	b	console_core_init
 endfunc plat_crash_console_init
 
 	/* ---------------------------------------------
@@ -60,18 +60,18 @@ endfunc plat_crash_console_init
 	 */
 func plat_crash_console_putc
 	ldr	r1, =PLAT_ARM_CRASH_UART_BASE
-	b	console_pl011_core_putc
+	b	console_core_putc
 endfunc plat_crash_console_putc
 
 	/* ---------------------------------------------
-	 * void plat_crash_console_flush()
+	 * int plat_crash_console_flush()
 	 * Function to force a write of all buffered
 	 * data that hasn't been output.
-	 * Out : void.
-	 * Clobber list : r0
+	 * Out : return -1 on error else return 0.
+	 * Clobber list : r0 - r1
 	 * ---------------------------------------------
 	 */
 func plat_crash_console_flush
-	ldr	r0, =PLAT_ARM_CRASH_UART_BASE
-	b	console_pl011_core_flush
+	ldr	r1, =PLAT_ARM_CRASH_UART_BASE
+	b	console_core_flush
 endfunc plat_crash_console_flush

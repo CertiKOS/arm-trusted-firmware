@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <string.h>
-
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <lib/el3_runtime/context_mgmt.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <context_mgmt.h>
+#include <string.h>
 #include "tlkd_private.h"
 
 #define AT_MASK		3
@@ -38,20 +36,19 @@ uint64_t tlkd_va_translate(uintptr_t va, int type)
 	int at = type & AT_MASK;
 	switch (at) {
 	case 0:
-		AT(ats12e1r, va);
+		ats12e1r(va);
 		break;
 	case 1:
-		AT(ats12e1w, va);
+		ats12e1w(va);
 		break;
 	case 2:
-		AT(ats12e0r, va);
+		ats12e0r(va);
 		break;
 	case 3:
-		AT(ats12e0w, va);
+		ats12e0w(va);
 		break;
 	default:
-		assert(0); /* Unreachable */
-		break;
+		assert(0);
 	}
 
 	/* get the (NS/S) physical address */
@@ -133,7 +130,7 @@ uint64_t tlkd_synchronous_sp_entry(tlk_context_t *tlk_ctx)
 	cm_set_next_eret_context(SECURE);
 
 	rc = tlkd_enter_sp(&tlk_ctx->c_rt_ctx);
-#if ENABLE_ASSERTIONS
+#if DEBUG
 	tlk_ctx->c_rt_ctx = 0;
 #endif
 

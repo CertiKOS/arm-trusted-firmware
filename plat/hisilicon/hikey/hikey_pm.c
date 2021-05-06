@@ -1,24 +1,23 @@
 /*
- * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/arm/cci.h>
-#include <drivers/arm/gicv2.h>
-#include <drivers/arm/sp804_delay_timer.h>
-#include <lib/mmio.h>
-#include <lib/psci/psci.h>
-
+#include <assert.h>
+#include <cci.h>
+#include <debug.h>
+#include <gicv2.h>
 #include <hi6220.h>
-#include <hikey_def.h>
 #include <hisi_ipc.h>
 #include <hisi_pwrc.h>
 #include <hisi_sram_map.h>
+#include <mmio.h>
+#include <psci.h>
+#include <sp804_delay_timer.h>
+
+#include "hikey_def.h"
 
 #define CORE_PWR_STATE(state) \
 	((state)->pwr_domain_state[MPIDR_AFFLVL0])
@@ -41,9 +40,7 @@ static int hikey_pwr_domain_on(u_register_t mpidr)
 		hisi_ipc_cluster_on(cpu, cluster);
 
 	hisi_pwrc_set_core_bx_addr(cpu, cluster, hikey_sec_entrypoint);
-	hisi_pwrc_enable_debug(cpu, cluster);
 	hisi_ipc_cpu_on(cpu, cluster);
-
 	return 0;
 }
 

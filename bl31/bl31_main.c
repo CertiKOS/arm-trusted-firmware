@@ -1,26 +1,23 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <string.h>
-
 #include <arch.h>
-#include <arch_features.h>
 #include <arch_helpers.h>
-#include <bl31/bl31.h>
-#include <bl31/ehf.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <drivers/console.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/pmf/pmf.h>
-#include <lib/runtime_instr.h>
-#include <plat/common/platform.h>
-#include <services/std_svc.h>
+#include <assert.h>
+#include <bl_common.h>
+#include <bl31.h>
+#include <console.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <platform.h>
+#include <pmf.h>
+#include <runtime_instr.h>
+#include <runtime_svc.h>
+#include <std_svc.h>
+#include <string.h>
 
 #if ENABLE_RUNTIME_INSTRUMENTATION
 PMF_REGISTER_SERVICE_SMC(rt_instr_svc, PMF_RT_INSTR_SVC_ID,
@@ -41,23 +38,14 @@ static int32_t (*bl32_init)(void);
  ******************************************************************************/
 static uint32_t next_image_type = NON_SECURE;
 
-#ifdef SUPPORT_UNKNOWN_MPID
-/*
- * Flag to know whether an unsupported MPID has been detected. To avoid having it
- * landing on the .bss section, it is initialized to a non-zero value, this way
- * we avoid potential WAW hazards during system bring up.
- * */
-volatile uint32_t unsupported_mpid_flag = 1;
-#endif
-
 /*
  * Implement the ARM Standard Service function to get arguments for a
  * particular service.
  */
-uintptr_t get_arm_std_svc_args(unsigned int svc_mask)
+uintptr_t get_arm_std_svc_args(uint32_t svc_mask)
 {
 	/* Setup the arguments for PSCI Library */
-	DEFINE_STATIC_PSCI_LIB_ARGS_V1(psci_args, bl31_warm_entrypoint);
+	DEFINE_STATIC_PSCI_LIB_ARGS_V1(psci_args, (uintptr_t)bl31_warm_entrypoint);
 
 	/* PSCI is the only ARM Standard Service implemented */
 	assert(svc_mask == PSCI_FID_MASK);
@@ -68,30 +56,9 @@ uintptr_t get_arm_std_svc_args(unsigned int svc_mask)
 /*******************************************************************************
  * Simple function to initialise all BL31 helper libraries.
  ******************************************************************************/
-void __init bl31_lib_init(void)
+void bl31_lib_init(void)
 {
 	cm_init();
-}
-
-/*******************************************************************************
- * Setup function for BL31.
- ******************************************************************************/
-void bl31_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
-		u_register_t arg3)
-{
-	/* Perform early platform-specific setup */
-	bl31_early_platform_setup2(arg0, arg1, arg2, arg3);
-
-	/* Perform late platform-specific setup */
-	bl31_plat_arch_setup();
-
-#if CTX_INCLUDE_PAUTH_REGS
-	/*
-	 * Assert that the ARMv8.3-PAuth registers are present or an access
-	 * fault will be triggered when they are being saved or restored.
-	 */
-	assert(is_armv8_3_pauth_present());
-#endif /* CTX_INCLUDE_PAUTH_REGS */
 }
 
 /*******************************************************************************
@@ -99,30 +66,19 @@ void bl31_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
  * before passing control to the bootloader or an Operating System. This
  * function calls runtime_svc_init() which initializes all registered runtime
  * services. The run time services would setup enough context for the core to
- * switch to the next exception level. When this function returns, the core will
- * switch to the programmed exception level via an ERET.
+ * swtich to the next exception level. When this function returns, the core will
+ * switch to the programmed exception level via. an ERET.
  ******************************************************************************/
 void bl31_main(void)
 {
 	NOTICE("BL31: %s\n", version_string);
 	NOTICE("BL31: %s\n", build_message);
 
-#ifdef SUPPORT_UNKNOWN_MPID
-	if (unsupported_mpid_flag == 0) {
-		NOTICE("Unsupported MPID detected!\n");
-	}
-#endif
-
 	/* Perform platform setup in BL31 */
 	bl31_platform_setup();
 
 	/* Initialise helper libraries */
 	bl31_lib_init();
-
-#if EL3_EXCEPTION_HANDLING
-	INFO("BL31: Initialising Exception Handling Framework\n");
-	ehf_init();
-#endif
 
 	/* Initialize the runtime services e.g. psci. */
 	INFO("BL31: Initializing runtime services\n");
@@ -133,21 +89,17 @@ void bl31_main(void)
 	 * decide which is the next image (BL32 or BL33) and how to execute it.
 	 * If the SPD runtime service is present, it would want to pass control
 	 * to BL32 first in S-EL1. In that case, SPD would have registered a
-	 * function to initialize bl32 where it takes responsibility of entering
+	 * function to intialize bl32 where it takes responsibility of entering
 	 * S-EL1 and returning control back to bl31_main. Once this is done we
 	 * can prepare entry into BL33 as normal.
 	 */
 
 	/*
-	 * If SPD had registered an init hook, invoke it.
+	 * If SPD had registerd an init hook, invoke it.
 	 */
 	if (bl32_init != NULL) {
 		INFO("BL31: Initializing BL32\n");
-
-		int32_t rc = (*bl32_init)();
-
-		if (rc == 0)
-			WARN("BL31: BL32 initialization failed\n");
+		(*bl32_init)();
 	}
 	/*
 	 * We are ready to enter the next EL. Prepare entry into the image
@@ -155,7 +107,7 @@ void bl31_main(void)
 	 */
 	bl31_prepare_next_image_entry();
 
-	console_flush();
+	(void)console_flush();
 
 	/*
 	 * Perform any platform specific runtime setup prior to cold boot exit
@@ -187,7 +139,7 @@ uint32_t bl31_get_next_image_type(void)
  * This function programs EL3 registers and performs other setup to enable entry
  * into the next image after BL31 at the next ERET.
  ******************************************************************************/
-void __init bl31_prepare_next_image_entry(void)
+void bl31_prepare_next_image_entry(void)
 {
 	entry_point_info_t *next_image_info;
 	uint32_t image_type;
@@ -197,9 +149,9 @@ void __init bl31_prepare_next_image_entry(void)
 	 * Ensure that the build flag to save AArch32 system registers in CPU
 	 * context is not set for AArch64-only platforms.
 	 */
-	if (el_implemented(1) == EL_IMPL_A64ONLY) {
+	if (EL_IMPLEMENTED(1) == EL_IMPL_A64ONLY) {
 		ERROR("EL1 supports AArch64-only. Please set build flag "
-				"CTX_INCLUDE_AARCH32_REGS = 0\n");
+				"CTX_INCLUDE_AARCH32_REGS = 0");
 		panic();
 	}
 #endif

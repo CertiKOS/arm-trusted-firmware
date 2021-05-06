@@ -1,14 +1,14 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef UNIPHIER_H
-#define UNIPHIER_H
+#ifndef __UNIPHIER_H__
+#define __UNIPHIER_H__
 
 #include <stdint.h>
-#include <string.h>
+#include <types.h>
 
 unsigned int uniphier_get_soc_type(void);
 unsigned int uniphier_get_soc_model(void);
@@ -25,8 +25,7 @@ unsigned int uniphier_get_boot_device(unsigned int soc);
 #define UNIPHIER_BOOT_DEVICE_EMMC	0
 #define UNIPHIER_BOOT_DEVICE_NAND	1
 #define UNIPHIER_BOOT_DEVICE_NOR	2
-#define UNIPHIER_BOOT_DEVICE_SD		3
-#define UNIPHIER_BOOT_DEVICE_USB	4
+#define UNIPHIER_BOOT_DEVICE_USB	3
 #define UNIPHIER_BOOT_DEVICE_RSV	0xffffffff
 
 unsigned int uniphier_get_boot_master(unsigned int soc);
@@ -35,29 +34,25 @@ unsigned int uniphier_get_boot_master(unsigned int soc);
 #define UNIPHIER_BOOT_MASTER_SCP	1
 #define UNIPHIER_BOOT_MASTER_EXT	2
 
-void uniphier_console_setup(unsigned int soc);
+void uniphier_console_setup(void);
 
-struct io_block_dev_spec;
-int uniphier_emmc_init(unsigned int soc,
-		       struct io_block_dev_spec **block_dev_spec);
-int uniphier_nand_init(unsigned int soc,
-		       struct io_block_dev_spec **block_dev_spec);
-int uniphier_usb_init(unsigned int soc,
-		      struct io_block_dev_spec **block_dev_spec);
+int uniphier_emmc_init(uintptr_t *block_dev_spec);
+int uniphier_nand_init(uintptr_t *block_dev_spec);
+int uniphier_usb_init(unsigned int soc, uintptr_t *block_dev_spec);
 
-int uniphier_io_setup(unsigned int soc, uintptr_t mem_base);
-
-void uniphier_init_image_descs(uintptr_t mem_base);
-struct image_info;
-struct image_info *uniphier_get_image_info(unsigned int image_id);
+int uniphier_io_setup(unsigned int soc);
+int uniphier_check_image(unsigned int image_id);
+void uniphier_image_descs_fixup(void);
 
 int uniphier_scp_is_running(void);
-void uniphier_scp_start(uint32_t scp_base);
+void uniphier_scp_start(void);
 void uniphier_scp_open_com(void);
 void uniphier_scp_system_off(void);
 void uniphier_scp_system_reset(void);
 
-void uniphier_mmap_setup(unsigned int soc);
+struct mmap_region;
+void uniphier_mmap_setup(uintptr_t total_base, size_t total_size,
+			 const struct mmap_region *mmap);
 
 void uniphier_cci_init(unsigned int soc);
 void uniphier_cci_enable(void);
@@ -69,8 +64,16 @@ void uniphier_gic_cpuif_enable(void);
 void uniphier_gic_cpuif_disable(void);
 void uniphier_gic_pcpu_init(void);
 
-void uniphier_psci_init(unsigned int soc);
-
 unsigned int uniphier_calc_core_pos(u_register_t mpidr);
 
-#endif /* UNIPHIER_H */
+#define UNIPHIER_NS_DRAM_BASE		0x84000000
+#define UNIPHIER_NS_DRAM_SIZE		0x01000000
+
+#define UNIPHIER_BL33_BASE		(UNIPHIER_NS_DRAM_BASE)
+#define UNIPHIER_BL33_MAX_SIZE		0x00100000
+
+#define UNIPHIER_SCP_BASE		((UNIPHIER_BL33_BASE) + \
+					 (UNIPHIER_BL33_MAX_SIZE))
+#define UNIPHIER_SCP_MAX_SIZE		0x00020000
+
+#endif /* __UNIPHIER_H__ */

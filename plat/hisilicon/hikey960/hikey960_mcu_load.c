@@ -4,17 +4,15 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <errno.h>
-#include <string.h>
-
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
-#include <lib/mmio.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <debug.h>
+#include <delay_timer.h>
+#include <errno.h>
 #include <hi3660.h>
+#include <mmio.h>
+#include <string.h>
 
 #define ADDR_CONVERT(addr)		((addr) < 0x40000 ?	\
 					 (addr) + 0xFFF30000 :	\

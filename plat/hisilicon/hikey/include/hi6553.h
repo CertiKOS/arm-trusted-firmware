@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef HI6553_H
-#define HI6553_H
-
-#include <lib/mmio.h>
+#ifndef __HI6553_H__
+#define __HI6553_H__
 
 #include <hi6220.h>
+#include <mmio.h>
 
 #define HI6553_DISABLE6_XO_CLK			(PMUSSI_BASE + (0x036 << 2))
 
@@ -20,7 +19,6 @@
 #define DISABLE6_XO_CLK_RF2			(1 << 4)
 
 #define HI6553_VERSION_REG			(PMUSSI_BASE + (0x000 << 2))
-#define HI6553_IRQ2_MASK			(PMUSSI_BASE + (0x008 << 2))
 #define HI6553_ENABLE2_LDO1_8			(PMUSSI_BASE + (0x029 << 2))
 #define HI6553_DISABLE2_LDO1_8			(PMUSSI_BASE + (0x02a << 2))
 #define HI6553_ONOFF_STATUS2_LDO1_8		(PMUSSI_BASE + (0x02b << 2))
@@ -79,4 +77,4 @@
 #define PMU_HI6552_V300				0x30
 #define PMU_HI6552_V310				0x31
 
-#endif /* HI6553_H */
+#endif	/* __HI6553_H__ */

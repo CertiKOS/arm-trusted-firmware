@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2016-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <common/bl_common.h>
+#include <bl_common.h>
 #include <context.h>
 #include <el3_common_macros.S>
 #include <smccc_helpers.h>
@@ -44,19 +44,20 @@ func bl1_entrypoint
 * ---------------------------------------------------------------------
 */
 	el3_entrypoint_common					\
-		_init_sctlr=1					\
+		_set_endian=1					\
 		_warm_boot_mailbox=!PROGRAMMABLE_RESET_ADDRESS	\
 		_secondary_cold_boot=!COLD_BOOT_SINGLE_CPU	\
 		_init_memory=1					\
 		_init_c_runtime=1				\
-		_exception_vectors=bl1_vector_table		\
-		_pie_fixup_size=0
+		_exception_vectors=bl1_vector_table
 
 	/* -----------------------------------------------------
-	 * Perform BL1 setup
+	 * Perform early platform setup & platform
+	 * specific early arch. setup e.g. mmu setup
 	 * -----------------------------------------------------
 	 */
-	bl	bl1_setup
+	bl	bl1_early_platform_setup
+	bl	bl1_plat_arch_setup
 
 	/* -----------------------------------------------------
 	 * Jump to main function.

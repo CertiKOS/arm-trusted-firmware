@@ -1,20 +1,28 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <lib/psci/psci.h>
-#include <plat/arm/common/plat_arm.h>
-#include <plat/common/platform.h>
+#include <arm_def.h>
+#include <arm_gic.h>
+#include <assert.h>
+#include <console.h>
+#include <errno.h>
+#include <plat_arm.h>
+#include <platform_def.h>
+#include <psci.h>
 
-/* Allow ARM Standard platforms to override these functions */
-#pragma weak plat_arm_program_trusted_mailbox
+/* Allow ARM Standard platforms to override this function */
+#pragma weak plat_arm_psci_override_pm_ops
+
+/* Standard ARM platforms are expected to export plat_arm_psci_pm_ops */
+extern plat_psci_ops_t plat_arm_psci_pm_ops;
+
+#if ARM_RECOM_STATE_ID_ENC
+extern unsigned int arm_pm_idle_states[];
+#endif /* __ARM_RECOM_STATE_ID_ENC__ */
 
 #if !ARM_RECOM_STATE_ID_ENC
 /*******************************************************************************
@@ -24,11 +32,11 @@
 int arm_validate_power_state(unsigned int power_state,
 			    psci_power_state_t *req_state)
 {
-	unsigned int pstate = psci_get_pstate_type(power_state);
-	unsigned int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
-	unsigned int i;
+	int pstate = psci_get_pstate_type(power_state);
+	int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
+	int i;
 
-	assert(req_state != NULL);
+	assert(req_state);
 
 	if (pwr_lvl > PLAT_MAX_PWR_LVL)
 		return PSCI_E_INVALID_PARAMS;
@@ -53,7 +61,7 @@ int arm_validate_power_state(unsigned int power_state,
 	/*
 	 * We expect the 'state id' to be zero.
 	 */
-	if (psci_get_pstate_id(power_state) != 0U)
+	if (psci_get_pstate_id(power_state))
 		return PSCI_E_INVALID_PARAMS;
 
 	return PSCI_E_SUCCESS;
@@ -71,7 +79,7 @@ int arm_validate_power_state(unsigned int power_state,
 	unsigned int state_id;
 	int i;
 
-	assert(req_state != NULL);
+	assert(req_state);
 
 	/*
 	 *  Currently we are using a linear search for finding the matching
@@ -103,7 +111,7 @@ int arm_validate_power_state(unsigned int power_state,
 
 /*******************************************************************************
  * ARM standard platform handler called to check the validity of the non secure
- * entrypoint. Returns 0 if the entrypoint is valid, or -1 otherwise.
+ * entrypoint.
  ******************************************************************************/
 int arm_validate_ns_entrypoint(uintptr_t entrypoint)
 {
@@ -112,47 +120,23 @@ int arm_validate_ns_entrypoint(uintptr_t entrypoint)
 	 * secure DRAM.
 	 */
 	if ((entrypoint >= ARM_NS_DRAM1_BASE) && (entrypoint <
-			(ARM_NS_DRAM1_BASE + ARM_NS_DRAM1_SIZE))) {
-		return 0;
-	}
-#ifdef __aarch64__
+			(ARM_NS_DRAM1_BASE + ARM_NS_DRAM1_SIZE)))
+		return PSCI_E_SUCCESS;
+#ifndef AARCH32
 	if ((entrypoint >= ARM_DRAM2_BASE) && (entrypoint <
-			(ARM_DRAM2_BASE + ARM_DRAM2_SIZE))) {
-		return 0;
-	}
+			(ARM_DRAM2_BASE + ARM_DRAM2_SIZE)))
+		return PSCI_E_SUCCESS;
 #endif
 
-	return -1;
-}
-
-int arm_validate_psci_entrypoint(uintptr_t entrypoint)
-{
-	return (arm_validate_ns_entrypoint(entrypoint) == 0) ? PSCI_E_SUCCESS :
-		PSCI_E_INVALID_ADDRESS;
+	return PSCI_E_INVALID_ADDRESS;
 }
 
 /******************************************************************************
- * Helper function to save the platform state before a system suspend. Save the
- * state of the system components which are not in the Always ON power domain.
+ * Default definition on ARM standard platforms to override the plat_psci_ops.
  *****************************************************************************/
-void arm_system_pwr_domain_save(void)
+const plat_psci_ops_t *plat_arm_psci_override_pm_ops(plat_psci_ops_t *ops)
 {
-	/* Assert system power domain is available on the platform */
-	assert(PLAT_MAX_PWR_LVL >= ARM_PWR_LVL2);
-
-	plat_arm_gic_save();
-
-	/*
-	 * Unregister console now so that it is not registered for a second
-	 * time during resume.
-	 */
-	arm_console_runtime_end();
-
-	/*
-	 * All the other peripheral which are configured by ARM TF are
-	 * re-initialized on resume from system suspend. Hence we
-	 * don't save their state here.
-	 */
+	return ops;
 }
 
 /******************************************************************************
@@ -163,24 +147,28 @@ void arm_system_pwr_domain_save(void)
  *****************************************************************************/
 void arm_system_pwr_domain_resume(void)
 {
-	/* Initialize the console */
-	arm_console_runtime_init();
+	console_init(PLAT_ARM_BL31_RUN_UART_BASE, PLAT_ARM_BL31_RUN_UART_CLK_IN_HZ,
+						ARM_CONSOLE_BAUDRATE);
 
 	/* Assert system power domain is available on the platform */
 	assert(PLAT_MAX_PWR_LVL >= ARM_PWR_LVL2);
 
-	plat_arm_gic_resume();
-
+	/*
+	 * TODO: On GICv3 systems, figure out whether the core that wakes up
+	 * first from system suspend need to initialize the re-distributor
+	 * interface of all the other suspended cores.
+	 */
+	plat_arm_gic_init();
 	plat_arm_security_setup();
 	arm_configure_sys_timer();
 }
 
 /*******************************************************************************
- * ARM platform function to program the mailbox for a cpu before it is released
+ * Private function to program the mailbox for a cpu before it is released
  * from reset. This function assumes that the Trusted mail box base is within
  * the ARM_SHARED_RAM region
  ******************************************************************************/
-void plat_arm_program_trusted_mailbox(uintptr_t address)
+void arm_program_trusted_mailbox(uintptr_t address)
 {
 	uintptr_t *mailbox = (void *) PLAT_ARM_TRUSTED_MAILBOX_BASE;
 
@@ -199,12 +187,12 @@ void plat_arm_program_trusted_mailbox(uintptr_t address)
  * The ARM Standard platform definition of platform porting API
  * `plat_setup_psci_ops`.
  ******************************************************************************/
-int __init plat_setup_psci_ops(uintptr_t sec_entrypoint,
+int plat_setup_psci_ops(uintptr_t sec_entrypoint,
 				const plat_psci_ops_t **psci_ops)
 {
 	*psci_ops = plat_arm_psci_override_pm_ops(&plat_arm_psci_pm_ops);
 
 	/* Setup mailbox with entry point. */
-	plat_arm_program_trusted_mailbox(sec_entrypoint);
+	arm_program_trusted_mailbox(sec_entrypoint);
 	return 0;
 }

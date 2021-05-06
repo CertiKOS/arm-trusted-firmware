@@ -1,13 +1,10 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
-#include <plat/arm/common/plat_arm.h>
-#include <plat/common/platform.h>
+#include <plat_arm.h>
 
 #if ARM_PLAT_MT
 #pragma weak plat_arm_get_cpu_pe_count
@@ -21,18 +18,9 @@
  *****************************************************************************/
 int plat_core_pos_by_mpidr(u_register_t mpidr)
 {
-	if (arm_check_mpidr(mpidr) == 0) {
-#if ARM_PLAT_MT
-		assert((read_mpidr_el1() & MPIDR_MT_MASK) != 0);
-
-		/*
-		 * The DTB files don't provide the MT bit in the mpidr argument
-		 * so set it manually before calculating core position
-		 */
-		mpidr |= MPIDR_MT_MASK;
-#endif
+	if (arm_check_mpidr(mpidr) == 0)
 		return plat_arm_calc_core_pos(mpidr);
-	}
+
 	return -1;
 }
 

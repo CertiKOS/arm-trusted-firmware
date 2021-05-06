@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 /* ZynqMP power management enums and defines */
 
-#ifndef PM_DEFS_H
-#define PM_DEFS_H
+#ifndef _PM_DEFS_H_
+#define _PM_DEFS_H_
 
 /*********************************************************************
  * Macro definitions
@@ -17,8 +17,8 @@
  * Version number is a 32bit value, like:
  * (PM_VERSION_MAJOR << 16) | PM_VERSION_MINOR
  */
-#define PM_VERSION_MAJOR	1
-#define PM_VERSION_MINOR	1
+#define PM_VERSION_MAJOR	0
+#define PM_VERSION_MINOR	2
 
 #define PM_VERSION	((PM_VERSION_MAJOR << 16) | PM_VERSION_MINOR)
 
@@ -33,7 +33,6 @@
 #define PM_STATE_CPU_IDLE		0x0U
 #define PM_STATE_SUSPEND_TO_RAM		0xFU
 
-#define EM_FUNID_NUM_MASK    0xF0000U
 /*********************************************************************
  * Enum definitions
  ********************************************************************/
@@ -63,44 +62,10 @@ enum pm_api_id {
 	PM_RESET_GET_STATUS,
 	PM_MMIO_WRITE,
 	PM_MMIO_READ,
-	PM_INIT_FINALIZE,
+	PM_INIT,
 	PM_FPGA_LOAD,
 	PM_FPGA_GET_STATUS,
 	PM_GET_CHIPID,
-	PM_SECURE_RSA_AES,
-	PM_SECURE_SHA,
-	PM_SECURE_RSA,
-	PM_PINCTRL_REQUEST,
-	PM_PINCTRL_RELEASE,
-	PM_PINCTRL_GET_FUNCTION,
-	PM_PINCTRL_SET_FUNCTION,
-	PM_PINCTRL_CONFIG_PARAM_GET,
-	PM_PINCTRL_CONFIG_PARAM_SET,
-	PM_IOCTL,
-	/* API to query information from firmware */
-	PM_QUERY_DATA,
-	/* Clock control API functions */
-	PM_CLOCK_ENABLE,
-	PM_CLOCK_DISABLE,
-	PM_CLOCK_GETSTATE,
-	PM_CLOCK_SETDIVIDER,
-	PM_CLOCK_GETDIVIDER,
-	PM_CLOCK_SETRATE,
-	PM_CLOCK_GETRATE,
-	PM_CLOCK_SETPARENT,
-	PM_CLOCK_GETPARENT,
-	PM_SECURE_IMAGE,
-	/* FPGA PL Readback */
-	PM_FPGA_READ,
-	PM_SECURE_AES,
-	/* PLL control API functions */
-	PM_PLL_SET_PARAMETER,
-	PM_PLL_GET_PARAMETER,
-	PM_PLL_SET_MODE,
-	PM_PLL_GET_MODE,
-	/* PM Register Access API */
-	PM_REGISTER_ACCESS,
-	PM_EFUSE_ACCESS,
 	PM_API_MAX
 };
 
@@ -114,7 +79,7 @@ enum pm_node_id {
 	NODE_RPU,
 	NODE_RPU_0,
 	NODE_RPU_1,
-	NODE_PLD,
+	NODE_PL,
 	NODE_FPD,
 	NODE_OCM_BANK_0,
 	NODE_OCM_BANK_1,
@@ -154,7 +119,7 @@ enum pm_node_id {
 	NODE_GPIO,
 	NODE_CAN_0,
 	NODE_CAN_1,
-	NODE_EXTERN,
+	NODE_AFI,
 	NODE_APLL,
 	NODE_VPLL,
 	NODE_DPLL,
@@ -167,23 +132,7 @@ enum pm_node_id {
 	NODE_PCIE,
 	NODE_PCAP,
 	NODE_RTC,
-	NODE_LPD,
-	NODE_VCU,
-	NODE_IPI_RPU_1,
-	NODE_IPI_PL_0,
-	NODE_IPI_PL_1,
-	NODE_IPI_PL_2,
-	NODE_IPI_PL_3,
-	NODE_PL,
-	NODE_GEM_TSU,
-	NODE_SWDT_0,
-	NODE_SWDT_1,
-	NODE_CSU,
-	NODE_PJTAG,
-	NODE_TRACE,
-	NODE_TESTSCAN,
-	NODE_PMU,
-	NODE_MAX,
+	NODE_MAX
 };
 
 enum pm_request_ack {
@@ -219,29 +168,26 @@ enum pm_opchar_type {
 
 /**
  * @PM_RET_SUCCESS:		success
- * @PM_RET_ERROR_ARGS:		illegal arguments provided (deprecated)
- * @PM_RET_ERROR_NOTSUPPORTED:	feature not supported  (deprecated)
- * @PM_RET_ERROR_INTERNAL:	internal error
- * @PM_RET_ERROR_CONFLICT:	conflict
+ * @PM_RET_ERROR_ARGS:		illegal arguments provided
  * @PM_RET_ERROR_ACCESS:	access rights violation
- * @PM_RET_ERROR_INVALID_NODE:	invalid node
- * @PM_RET_ERROR_DOUBLE_REQ:	duplicate request for same node
- * @PM_RET_ERROR_ABORT_SUSPEND:	suspend procedure has been aborted
  * @PM_RET_ERROR_TIMEOUT:	timeout in communication with PMU
- * @PM_RET_ERROR_NODE_USED:	node is already in use
+ * @PM_RET_ERROR_NOTSUPPORTED:	feature not supported
+ * @PM_RET_ERROR_PROC:		node is not a processor node
+ * @PM_RET_ERROR_API_ID:	illegal API ID
+ * @PM_RET_ERROR_OTHER:		other error
  */
 enum pm_ret_status {
 	PM_RET_SUCCESS,
-	PM_RET_ERROR_ARGS = 1,
-	PM_RET_ERROR_NOTSUPPORTED = 4,
-	PM_RET_ERROR_INTERNAL = 2000,
-	PM_RET_ERROR_CONFLICT = 2001,
-	PM_RET_ERROR_ACCESS = 2002,
-	PM_RET_ERROR_INVALID_NODE = 2003,
-	PM_RET_ERROR_DOUBLE_REQ = 2004,
-	PM_RET_ERROR_ABORT_SUSPEND = 2005,
-	PM_RET_ERROR_TIMEOUT = 2006,
-	PM_RET_ERROR_NODE_USED = 2007
+	PM_RET_ERROR_ARGS,
+	PM_RET_ERROR_ACCESS,
+	PM_RET_ERROR_TIMEOUT,
+	PM_RET_ERROR_NOTSUPPORTED,
+	PM_RET_ERROR_PROC,
+	PM_RET_ERROR_API_ID,
+	PM_RET_ERROR_FAILURE,
+	PM_RET_ERROR_COMMUNIC,
+	PM_RET_ERROR_DOUBLEREQ,
+	PM_RET_ERROR_OTHER,
 };
 
 /**
@@ -255,82 +201,15 @@ enum pm_boot_status {
 	PM_BOOT_ERROR,
 };
 
-/**
- * @PMF_SHUTDOWN_TYPE_SHUTDOWN:		shutdown
- * @PMF_SHUTDOWN_TYPE_RESET:		reset/reboot
- * @PMF_SHUTDOWN_TYPE_SETSCOPE_ONLY:	set the shutdown/reboot scope
- */
 enum pm_shutdown_type {
 	PMF_SHUTDOWN_TYPE_SHUTDOWN,
 	PMF_SHUTDOWN_TYPE_RESET,
-	PMF_SHUTDOWN_TYPE_SETSCOPE_ONLY,
 };
 
-/**
- * @PMF_SHUTDOWN_SUBTYPE_SUBSYSTEM:	shutdown/reboot APU subsystem only
- * @PMF_SHUTDOWN_SUBTYPE_PS_ONLY:	shutdown/reboot entire PS (but not PL)
- * @PMF_SHUTDOWN_SUBTYPE_SYSTEM:	shutdown/reboot entire system
- */
 enum pm_shutdown_subtype {
 	PMF_SHUTDOWN_SUBTYPE_SUBSYSTEM,
 	PMF_SHUTDOWN_SUBTYPE_PS_ONLY,
 	PMF_SHUTDOWN_SUBTYPE_SYSTEM,
 };
 
-/**
- * @PM_PLL_PARAM_DIV2:         Enable for divide by 2 function inside the PLL
- * @PM_PLL_PARAM_FBDIV:        Feedback divisor integer portion for the PLL
- * @PM_PLL_PARAM_DATA:         Feedback divisor fractional portion for the PLL
- * @PM_PLL_PARAM_PRE_SRC:      Clock source for PLL input
- * @PM_PLL_PARAM_POST_SRC:     Clock source for PLL Bypass mode
- * @PM_PLL_PARAM_LOCK_DLY:     Lock circuit config settings for lock windowsize
- * @PM_PLL_PARAM_LOCK_CNT:     Lock circuit counter setting
- * @PM_PLL_PARAM_LFHF:         PLL loop filter high frequency capacitor control
- * @PM_PLL_PARAM_CP:           PLL charge pump control
- * @PM_PLL_PARAM_RES:          PLL loop filter resistor control
- */
-enum pm_pll_param {
-	PM_PLL_PARAM_DIV2,
-	PM_PLL_PARAM_FBDIV,
-	PM_PLL_PARAM_DATA,
-	PM_PLL_PARAM_PRE_SRC,
-	PM_PLL_PARAM_POST_SRC,
-	PM_PLL_PARAM_LOCK_DLY,
-	PM_PLL_PARAM_LOCK_CNT,
-	PM_PLL_PARAM_LFHF,
-	PM_PLL_PARAM_CP,
-	PM_PLL_PARAM_RES,
-	PM_PLL_PARAM_MAX,
-};
-
-/**
- * @PM_PLL_MODE_RESET:         PLL is in reset (not locked)
- * @PM_PLL_MODE_INTEGER:       PLL is locked in integer mode
- * @PM_PLL_MODE_FRACTIONAL:    PLL is locked in fractional mode
- */
-enum pm_pll_mode {
-	PM_PLL_MODE_RESET,
-	PM_PLL_MODE_INTEGER,
-	PM_PLL_MODE_FRACTIONAL,
-	PM_PLL_MODE_MAX,
-};
-
-/**
- * @PM_CLOCK_DIV0_ID:          Clock divider 0
- * @PM_CLOCK_DIV1_ID:          Clock divider 1
- */
-enum pm_clock_div_id {
-	PM_CLOCK_DIV0_ID,
-	PM_CLOCK_DIV1_ID,
-};
-
-/**
- * EM API IDs
- */
-enum em_api_id {
-	EM_SET_ACTION = 1,
-	EM_REMOVE_ACTION,
-	EM_SEND_ERRORS,
-};
-
-#endif /* PM_DEFS_H */
+#endif /* _PM_DEFS_H_ */

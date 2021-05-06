@@ -4,24 +4,21 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <errno.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <bl31/bl31.h>
-#include <common/debug.h>
-#include <drivers/console.h>
-#include <drivers/delay_timer.h>
-#include <lib/bakery_lock.h>
-#include <lib/mmio.h>
-#include <plat/common/platform.h>
-
+#include <debug.h>
+#include <assert.h>
+#include <bakery_lock.h>
+#include <bl31.h>
+#include <console.h>
+#include <delay_timer.h>
+#include <errno.h>
+#include <mmio.h>
+#include <platform.h>
+#include <platform_def.h>
 #include <plat_private.h>
 #include <pmu.h>
-#include <pmu_com.h>
 #include <rk3328_def.h>
+#include <pmu_com.h>
 
 DEFINE_BAKERY_LOCK(rockchip_pd_lock);
 
@@ -284,7 +281,7 @@ static inline void pm_pll_wait_lock(uint32_t pll_id)
 static inline void pll_pwr_dwn(uint32_t pll_id, uint32_t pd)
 {
 	mmio_write_32(CRU_BASE + PLL_CONS(pll_id, 1),
-		      BITS_WITH_WMASK(1U, 1U, 15));
+		      BITS_WITH_WMASK(1, 1, 15));
 	if (pd)
 		mmio_write_32(CRU_BASE + PLL_CONS(pll_id, 1),
 			      BITS_WITH_WMASK(1, 1, 14));
@@ -305,7 +302,7 @@ static __sramfunc void dpll_suspend(void)
 		sram_data.dpll_con_save[i] =
 				mmio_read_32(CRU_BASE + PLL_CONS(DPLL_ID, i));
 	mmio_write_32(CRU_BASE + PLL_CONS(DPLL_ID, 1),
-		      BITS_WITH_WMASK(1U, 1U, 15));
+		      BITS_WITH_WMASK(1, 1, 15));
 	mmio_write_32(CRU_BASE + PLL_CONS(DPLL_ID, 1),
 		      BITS_WITH_WMASK(1, 1, 14));
 }
@@ -315,7 +312,7 @@ static __sramfunc void dpll_resume(void)
 	uint32_t delay = PLL_LOCKED_TIMEOUT;
 
 	mmio_write_32(CRU_BASE + PLL_CONS(DPLL_ID, 1),
-		      BITS_WITH_WMASK(1U, 1U, 15));
+		      BITS_WITH_WMASK(1, 1, 15));
 	mmio_write_32(CRU_BASE + PLL_CONS(DPLL_ID, 1),
 		      BITS_WITH_WMASK(0, 1, 14));
 	mmio_write_32(CRU_BASE + PLL_CONS(DPLL_ID, 1),
@@ -402,7 +399,7 @@ static void pm_plls_suspend(void)
 	/* clk_rtc32k */
 	mmio_write_32(CRU_BASE + CRU_CLKSEL_CON(38),
 		      BITS_WITH_WMASK(767, 0x3fff, 0) |
-		      BITS_WITH_WMASK(2U, 0x3u, 14));
+		      BITS_WITH_WMASK(2, 0x3, 14));
 }
 
 static void pm_plls_resume(void)
@@ -411,7 +408,7 @@ static void pm_plls_resume(void)
 	mmio_write_32(CRU_BASE + CRU_CLKSEL_CON(38),
 		      ddr_data.clk_sel38 |
 		      BITS_WMSK(0x3fff, 0) |
-		      BITS_WMSK(0x3u, 14));
+		      BITS_WMSK(0x3, 14));
 
 	/* uart2 */
 	mmio_write_32(CRU_BASE + CRU_CLKSEL_CON(18),
@@ -483,7 +480,7 @@ __sramfunc void  rk3328_pmic_resume(void)
 	mmio_write_32(GPIO2_BASE, sram_data.pmic_sleep_gpio_save[0]);
 	mmio_write_32(GPIO2_BASE + 4, sram_data.pmic_sleep_gpio_save[1]);
 	mmio_write_32(GRF_BASE + PMIC_SLEEP_REG,
-		      sram_data.pmic_sleep_save | BITS_WMSK(0xffffu, 0));
+		      sram_data.pmic_sleep_save | BITS_WMSK(0xffff, 0));
 	/* Resuming volt need a lot of time */
 	sram_udelay(100);
 }
@@ -594,10 +591,8 @@ err_loop:
 __sramfunc void sram_suspend(void)
 {
 	/* disable mmu and icache */
-	disable_mmu_icache_el3();
 	tlbialle3();
-	dsbsy();
-	isb();
+	disable_mmu_icache_el3();
 
 	mmio_write_32(SGRF_BASE + SGRF_SOC_CON(1),
 		      ((uintptr_t)&pmu_cpuson_entrypoint >> CPU_BOOT_ADDR_ALIGN) |

@@ -3,10 +3,9 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include <asm_macros.S>
-#include <common/bl_common.h>
-#include <platform_def.h>
+#include <bl_common.h>
+#include <v2m_def.h>
 
 	.globl  plat_report_exception
 

@@ -1,17 +1,20 @@
 /*
- * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <common/bl_common.h>
+#include <bl_common.h>
 #include <cortex_a53.h>
 #include <cortex_a57.h>
 #include <cortex_a72.h>
 #include <cpu_macros.S>
-#include <platform_def.h>
+#include <css_def.h>
+#include <v2m_def.h>
+#include "../juno_def.h"
+
 
 	.globl	plat_reset_handler
 	.globl	plat_arm_calc_core_pos
@@ -34,6 +37,20 @@
 	.macro jump_to_handler _revision, _handler
 	cmp	x0, #\_revision
 	b.eq	\_handler
+	.endm
+
+	/* --------------------------------------------------------------------
+	 * Helper macro that reads the part number of the current CPU and jumps
+	 * to the given label if it matches the CPU MIDR provided.
+	 *
+	 * Clobbers x0.
+	 * --------------------------------------------------------------------
+	 */
+	.macro  jump_if_cpu_midr _cpu_midr, _label
+	mrs	x0, midr_el1
+	ubfx	x0, x0, MIDR_PN_SHIFT, #12
+	cmp     w0, #((\_cpu_midr >> MIDR_PN_SHIFT) & MIDR_PN_MASK)
+	b.eq	\_label
 	.endm
 
 	/* --------------------------------------------------------------------
@@ -182,7 +199,6 @@ func juno_do_reset_to_aarch32_state
 	msr	rmr_el3, x0
 	isb
 	wfi
-	b	plat_panic_handler
 endfunc juno_do_reset_to_aarch32_state
 
 	/* -----------------------------------------------------
@@ -217,6 +233,8 @@ func plat_get_my_entrypoint
 	ldr	x0, [x0]
 	cbz	x0, return
 	b	juno_do_reset_to_aarch32_state
+1:
+	b	1b
 return:
 	ret
 endfunc plat_get_my_entrypoint
@@ -248,16 +266,6 @@ endfunc plat_get_my_entrypoint
  * to AArch32 mode is then requested by writing into RMR_EL3.
  */
 func juno_reset_to_aarch32_state
-	/*
-	 * Invalidate all caches before the warm reset to AArch32 state.
-	 * This is required on the Juno AArch32 boot flow because the L2
-	 * unified cache may contain code and data from when the processor
-	 * was still executing in AArch64 state.  This code only runs on
-	 * the primary core, all other cores are powered down.
-	 */
-	mov	x0, #DCISW
-	bl	dcsw_op_all
-
 	emit_movw	w0, BL32_BASE
 	emit_movt	w1, BL32_BASE
 	/* opcode "bx r0" to branch using r0 in AArch32 mode */
@@ -269,7 +277,9 @@ func juno_reset_to_aarch32_state
 	str	w1, [x3], #4
 	str	w2, [x3]
 
-	b	juno_do_reset_to_aarch32_state
+	bl	juno_do_reset_to_aarch32_state
+1:
+	b	1b
 endfunc juno_reset_to_aarch32_state
 
 #endif /* JUNO_AARCH32_EL3_RUNTIME */

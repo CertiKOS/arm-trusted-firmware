@@ -3,23 +3,21 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <assert.h>
-#include <stdint.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <plat/common/platform.h>
-#include <tools_share/uuid.h>
-
+#include <assert.h>
+#include <debug.h>
 #include <oem_svc.h>
+#include <platform.h>
+#include <runtime_svc.h>
+#include <stdint.h>
+#include <uuid.h>
 
 /* OEM Service UUID */
-DEFINE_SVC_UUID2(oem_svc_uid,
-	0xd0ad43b9, 0x9b06, 0xe411, 0x91, 0x91,
-	0x08, 0x00, 0x20, 0x0c, 0x9a, 0x66);
+DEFINE_SVC_UUID(oem_svc_uid,
+		0xb943add0, 0x069d, 0x11e4, 0x91, 0x91,
+		0x08, 0x00, 0x20, 0x0c, 0x9a, 0x66);
+
 
 /* Setup OEM Services */
 static int32_t oem_svc_setup(void)
@@ -34,31 +32,38 @@ static int32_t oem_svc_setup(void)
 /*******************************************************************************
  * OEM top level handler for servicing SMCs.
  ******************************************************************************/
-uintptr_t oem_smc_handler(uint32_t smc_fid,
-			u_register_t x1,
-			u_register_t x2,
-			u_register_t x3,
-			u_register_t x4,
+uint64_t oem_smc_handler(uint32_t smc_fid,
+			uint64_t x1,
+			uint64_t x2,
+			uint64_t x3,
+			uint64_t x4,
 			void *cookie,
 			void *handle,
-			u_register_t flags)
+			uint64_t flags)
 {
-	WARN("Unimplemented OEM Call: 0x%x\n", smc_fid);
-	SMC_RET1(handle, SMC_UNK);
+	uint64_t rc;
+
+	switch (smc_fid) {
+	default:
+		rc = SMC_UNK;
+		WARN("Unimplemented OEM Call: 0x%x\n", smc_fid);
+	}
+
+	SMC_RET1(handle, rc);
 }
 
 /*
  * Top-level OEM Service SMC handler. This handler will in turn dispatch
  * calls to related SMC handler
  */
-uintptr_t oem_svc_smc_handler(uint32_t smc_fid,
-			 u_register_t x1,
-			 u_register_t x2,
-			 u_register_t x3,
-			 u_register_t x4,
+uint64_t oem_svc_smc_handler(uint32_t smc_fid,
+			 uint64_t x1,
+			 uint64_t x2,
+			 uint64_t x3,
+			 uint64_t x4,
 			 void *cookie,
 			 void *handle,
-			 u_register_t flags)
+			 uint64_t flags)
 {
 	/*
 	 * Dispatch OEM calls to OEM Common handler and return its return value

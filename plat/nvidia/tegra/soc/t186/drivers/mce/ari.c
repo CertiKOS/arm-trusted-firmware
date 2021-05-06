@@ -1,21 +1,19 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <errno.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
+#include <assert.h>
+#include <debug.h>
+#include <delay_timer.h>
 #include <denver.h>
-#include <lib/mmio.h>
-#include <plat/common/platform.h>
-
+#include <mmio.h>
 #include <mce_private.h>
+#include <platform.h>
+#include <sys/errno.h>
 #include <t18x_ari.h>
 
 /*******************************************************************************
@@ -500,8 +498,8 @@ int32_t ari_read_write_uncore_perfmon(uint32_t ari_base, uint64_t req,
 		uint64_t *data)
 {
 	int32_t ret, result;
-	uint32_t val, req_status;
-	uint8_t req_cmd;
+	uint32_t val;
+	uint8_t req_cmd, req_status;
 
 	req_cmd = (uint8_t)(req & UNCORE_PERFMON_CMD_MASK);
 
@@ -526,7 +524,7 @@ int32_t ari_read_write_uncore_perfmon(uint32_t ari_base, uint64_t req,
 			result = ret;
 		} else {
 			/* read the command status value */
-			req_status = ari_get_response_high(ari_base) &
+			req_status = (uint8_t)ari_get_response_high(ari_base) &
 					 UNCORE_PERFMON_RESP_STATUS_MASK;
 
 			/*

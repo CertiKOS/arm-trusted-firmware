@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SOC_CSS_DEF_H
-#define SOC_CSS_DEF_H
+#ifndef __SOC_CSS_DEF_H__
+#define __SOC_CSS_DEF_H__
 
-#include <lib/utils_def.h>
-#include <plat/common/common_def.h>
+#include <common_def.h>
+#include <utils_def.h>
+
 
 /*
  * Definitions common to all ARM CSS SoCs
@@ -23,8 +24,8 @@
 #define SOC_CSS_UART0_BASE		0x7ff80000
 #define SOC_CSS_UART1_BASE		0x7ff70000
 
-#define SOC_CSS_UART0_CLK_IN_HZ		7372800
-#define SOC_CSS_UART1_CLK_IN_HZ		7372800
+#define SOC_CSS_UART0_CLK_IN_HZ		7273800
+#define SOC_CSS_UART1_CLK_IN_HZ		7273800
 
 /* SoC NIC-400 Global Programmers View (GPV) */
 #define SOC_CSS_NIC400_BASE		0x7fd00000
@@ -83,4 +84,4 @@
 #define PLAT_ARM_SCP_TZC_DRAM1_SIZE	ULL(0x00200000)
 #endif
 
-#endif /* SOC_CSS_DEF_H */
+#endif /* __SOC_CSS_DEF_H__ */

@@ -1,23 +1,20 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <auth_common.h>
+#include <auth_mod.h>
+#include <cot_def.h>
+#include <crypto_mod.h>
+#include <debug.h>
+#include <img_parser_mod.h>
+#include <platform.h>
+#include <platform_def.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <platform_def.h>
-
-#include <common/debug.h>
-#include <common/tbbr/cot_def.h>
-#include <drivers/auth/auth_common.h>
-#include <drivers/auth/auth_mod.h>
-#include <drivers/auth/crypto_mod.h>
-#include <drivers/auth/img_parser_mod.h>
-#include <lib/fconf/fconf_tbbr_getter.h>
-#include <plat/common/platform.h>
 
 /* ASN.1 tags */
 #define ASN1_INTEGER                 0x02
@@ -31,6 +28,9 @@
 
 #pragma weak plat_set_nv_ctr2
 
+/* Pointer to CoT */
+extern const auth_img_desc_t *const cot_desc_ptr;
+extern unsigned int auth_img_flags[];
 
 static int cmp_auth_param_type_desc(const auth_param_type_desc_t *a,
 		const auth_param_type_desc_t *b)
@@ -50,9 +50,6 @@ static int auth_get_param(const auth_param_type_desc_t *param_type_desc,
 			  void **param, unsigned int *len)
 {
 	int i;
-
-	if (img_desc->authenticated_data == NULL)
-		return 1;
 
 	for (i = 0 ; i < COT_MAX_VERIFIED_PARAMS ; i++) {
 		if (0 == cmp_auth_param_type_desc(param_type_desc,
@@ -222,25 +219,19 @@ static int auth_signature(const auth_method_param_sig_t *param,
  * To protect the system against rollback, the platform includes a non-volatile
  * counter whose value can only be increased. All certificates include a counter
  * value that should not be lower than the value stored in the platform. If the
- * value is larger, the counter in the platform must be updated to the new value
- * (provided it has been authenticated).
+ * value is larger, the counter in the platform must be updated to the new
+ * value.
  *
  * Return: 0 = success, Otherwise = error
- * Returns additionally,
- * cert_nv_ctr -> NV counter value present in the certificate
- * need_nv_ctr_upgrade = 0 -> platform NV counter upgrade is not needed
- * need_nv_ctr_upgrade = 1 -> platform NV counter upgrade is needed
  */
 static int auth_nvctr(const auth_method_param_nv_ctr_t *param,
 		      const auth_img_desc_t *img_desc,
-		      void *img, unsigned int img_len,
-		      unsigned int *cert_nv_ctr,
-		      bool *need_nv_ctr_upgrade)
+		      void *img, unsigned int img_len)
 {
 	char *p;
 	void *data_ptr = NULL;
 	unsigned int data_len, len, i;
-	unsigned int plat_nv_ctr;
+	unsigned int cert_nv_ctr, plat_nv_ctr;
 	int rc = 0;
 
 	/* Get the counter value from current image. The AM expects the IPM
@@ -271,20 +262,22 @@ static int auth_nvctr(const auth_method_param_nv_ctr_t *param,
 	}
 
 	/* Convert to unsigned int. This code is for a little-endian CPU */
-	*cert_nv_ctr = 0;
+	cert_nv_ctr = 0;
 	for (i = 0; i < len; i++) {
-		*cert_nv_ctr = (*cert_nv_ctr << 8) | *p++;
+		cert_nv_ctr = (cert_nv_ctr << 8) | *p++;
 	}
 
 	/* Get the counter from the platform */
 	rc = plat_get_nv_ctr(param->plat_nv_ctr->cookie, &plat_nv_ctr);
 	return_if_error(rc);
 
-	if (*cert_nv_ctr < plat_nv_ctr) {
+	if (cert_nv_ctr < plat_nv_ctr) {
 		/* Invalid NV-counter */
 		return 1;
-	} else if (*cert_nv_ctr > plat_nv_ctr) {
-		*need_nv_ctr_upgrade = true;
+	} else if (cert_nv_ctr > plat_nv_ctr) {
+		rc = plat_set_nv_ctr2(param->plat_nv_ctr->cookie,
+			img_desc, cert_nv_ctr);
+		return_if_error(rc);
 	}
 
 	return 0;
@@ -307,8 +300,9 @@ int auth_mod_get_parent_id(unsigned int img_id, unsigned int *parent_id)
 	const auth_img_desc_t *img_desc = NULL;
 
 	assert(parent_id != NULL);
+
 	/* Get the image descriptor */
-	img_desc = FCONF_GET_PROPERTY(tbbr, cot, img_id);
+	img_desc = &cot_desc_ptr[img_id];
 
 	/* Check if the image has no parent (ROT) */
 	if (img_desc->parent == NULL) {
@@ -355,13 +349,9 @@ int auth_mod_verify_img(unsigned int img_id,
 	void *param_ptr;
 	unsigned int param_len;
 	int rc, i;
-	unsigned int cert_nv_ctr = 0;
-	bool need_nv_ctr_upgrade = false;
-	bool sig_auth_done = false;
-	const auth_method_param_nv_ctr_t *nv_ctr_param = NULL;
 
 	/* Get the image descriptor from the chain of trust */
-	img_desc = FCONF_GET_PROPERTY(tbbr, cot, img_id);
+	img_desc = &cot_desc_ptr[img_id];
 
 	/* Ask the parser to check the image integrity */
 	rc = img_parser_check_integrity(img_desc->img_type, img_ptr, img_len);
@@ -369,8 +359,6 @@ int auth_mod_verify_img(unsigned int img_id,
 
 	/* Authenticate the image using the methods indicated in the image
 	 * descriptor. */
-	if (img_desc->img_auth_methods == NULL)
-		return 1;
 	for (i = 0 ; i < AUTH_METHOD_NUM ; i++) {
 		auth_method = &img_desc->img_auth_methods[i];
 		switch (auth_method->type) {
@@ -384,13 +372,10 @@ int auth_mod_verify_img(unsigned int img_id,
 		case AUTH_METHOD_SIG:
 			rc = auth_signature(&auth_method->param.sig,
 					img_desc, img_ptr, img_len);
-			sig_auth_done = true;
 			break;
 		case AUTH_METHOD_NV_CTR:
-			nv_ctr_param = &auth_method->param.nv_ctr;
-			rc = auth_nvctr(nv_ctr_param,
-					img_desc, img_ptr, img_len,
-					&cert_nv_ctr, &need_nv_ctr_upgrade);
+			rc = auth_nvctr(&auth_method->param.nv_ctr,
+					img_desc, img_ptr, img_len);
 			break;
 		default:
 			/* Unknown authentication method */
@@ -400,39 +385,27 @@ int auth_mod_verify_img(unsigned int img_id,
 		return_if_error(rc);
 	}
 
-	/*
-	 * Do platform NV counter upgrade only if the certificate gets
-	 * authenticated, and platform NV-counter upgrade is needed.
-	 */
-	if (need_nv_ctr_upgrade && sig_auth_done) {
-		rc = plat_set_nv_ctr2(nv_ctr_param->plat_nv_ctr->cookie,
-				      img_desc, cert_nv_ctr);
-		return_if_error(rc);
-	}
-
 	/* Extract the parameters indicated in the image descriptor to
 	 * authenticate the children images. */
-	if (img_desc->authenticated_data != NULL) {
-		for (i = 0 ; i < COT_MAX_VERIFIED_PARAMS ; i++) {
-			if (img_desc->authenticated_data[i].type_desc == NULL) {
-				continue;
-			}
-
-			/* Get the parameter from the image parser module */
-			rc = img_parser_get_auth_param(img_desc->img_type,
-					img_desc->authenticated_data[i].type_desc,
-					img_ptr, img_len, &param_ptr, &param_len);
-			return_if_error(rc);
-
-			/* Check parameter size */
-			if (param_len > img_desc->authenticated_data[i].data.len) {
-				return 1;
-			}
-
-			/* Copy the parameter for later use */
-			memcpy((void *)img_desc->authenticated_data[i].data.ptr,
-					(void *)param_ptr, param_len);
+	for (i = 0 ; i < COT_MAX_VERIFIED_PARAMS ; i++) {
+		if (img_desc->authenticated_data[i].type_desc == NULL) {
+			continue;
 		}
+
+		/* Get the parameter from the image parser module */
+		rc = img_parser_get_auth_param(img_desc->img_type,
+				img_desc->authenticated_data[i].type_desc,
+				img_ptr, img_len, &param_ptr, &param_len);
+		return_if_error(rc);
+
+		/* Check parameter size */
+		if (param_len > img_desc->authenticated_data[i].data.len) {
+			return 1;
+		}
+
+		/* Copy the parameter for later use */
+		memcpy((void *)img_desc->authenticated_data[i].data.ptr,
+				(void *)param_ptr, param_len);
 	}
 
 	/* Mark image as authenticated */

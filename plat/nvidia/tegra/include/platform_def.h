@@ -1,36 +1,16 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PLATFORM_DEF_H
-#define PLATFORM_DEF_H
+#ifndef __PLATFORM_DEF_H__
+#define __PLATFORM_DEF_H__
 
 #include <arch.h>
-#include <lib/utils_def.h>
-
+#include <common_def.h>
 #include <tegra_def.h>
-
-/*******************************************************************************
- * Check and error if SEPARATE_CODE_AND_RODATA is not set to 1
- ******************************************************************************/
-#if !SEPARATE_CODE_AND_RODATA
-#error "SEPARATE_CODE_AND_RODATA should be set to 1"
-#endif
-
-/*
- * Platform binary types for linking
- */
-#define PLATFORM_LINKER_FORMAT		"elf64-littleaarch64"
-#define PLATFORM_LINKER_ARCH		aarch64
-
-/*
- * Platform binary types for linking
- */
-#define PLATFORM_LINKER_FORMAT		"elf64-littleaarch64"
-#define PLATFORM_LINKER_ARCH		aarch64
+#include <utils_def.h>
 
 /*******************************************************************************
  * Generic platform constants
@@ -47,7 +27,7 @@
 #define PLATFORM_CORE_COUNT		(PLATFORM_CLUSTER_COUNT * \
 					 PLATFORM_MAX_CPUS_PER_CLUSTER)
 #define PLAT_NUM_PWR_DOMAINS		(PLATFORM_CORE_COUNT + \
-					 PLATFORM_CLUSTER_COUNT + U(1))
+					 PLATFORM_CLUSTER_COUNT + 1)
 
 /*******************************************************************************
  * Platform console related constants
@@ -66,6 +46,7 @@
 /*******************************************************************************
  * BL31 specific defines.
  ******************************************************************************/
+#define BL31_SIZE			U(0x40000)
 #define BL31_BASE			TZDRAM_BASE
 #define BL31_LIMIT			(TZDRAM_BASE + BL31_SIZE - 1)
 #define BL32_BASE			(TZDRAM_BASE + BL31_SIZE)
@@ -77,56 +58,6 @@
  * integrated and external caches.
  ******************************************************************************/
 #define CACHE_WRITEBACK_SHIFT		6
-#define CACHE_WRITEBACK_GRANULE		(0x40) /* (U(1) << CACHE_WRITEBACK_SHIFT) */
+#define CACHE_WRITEBACK_GRANULE		(U(1) << CACHE_WRITEBACK_SHIFT)
 
-/*******************************************************************************
- * Dummy macros to compile io_storage support
- ******************************************************************************/
-#define MAX_IO_DEVICES			U(0)
-#define MAX_IO_HANDLES			U(0)
-
-/*******************************************************************************
- * Platforms macros to support SDEI
- ******************************************************************************/
-#define TEGRA_SDEI_SGI_PRIVATE		U(8)
-
-/*******************************************************************************
- * Platform macros to support exception handling framework
- ******************************************************************************/
-#define PLAT_PRI_BITS			U(3)
-#define PLAT_RAS_PRI			U(0x10)
-#define PLAT_SDEI_CRITICAL_PRI		U(0x20)
-#define PLAT_SDEI_NORMAL_PRI		U(0x30)
-#define PLAT_TEGRA_WDT_PRIO		U(0x40)
-
-#define PLAT_EHF_DESC			EHF_PRI_DESC(PLAT_PRI_BITS,\
-						     PLAT_TEGRA_WDT_PRIO)
-
-/*******************************************************************************
- * SDEI events
- ******************************************************************************/
-/* SDEI dynamic private event numbers */
-#define TEGRA_SDEI_DP_EVENT_0		U(100)
-#define TEGRA_SDEI_DP_EVENT_1		U(101)
-#define TEGRA_SDEI_DP_EVENT_2		U(102)
-
-/* SDEI dynamic shared event numbers */
-#define TEGRA_SDEI_DS_EVENT_0		U(200)
-#define TEGRA_SDEI_DS_EVENT_1		U(201)
-#define TEGRA_SDEI_DS_EVENT_2		U(202)
-
-/* SDEI explicit events */
-#define TEGRA_SDEI_EP_EVENT_0		U(300)
-#define TEGRA_SDEI_EP_EVENT_1		U(301)
-#define TEGRA_SDEI_EP_EVENT_2		U(302)
-#define TEGRA_SDEI_EP_EVENT_3		U(303)
-#define TEGRA_SDEI_EP_EVENT_4		U(304)
-#define TEGRA_SDEI_EP_EVENT_5		U(305)
-#define TEGRA_SDEI_EP_EVENT_6		U(306)
-#define TEGRA_SDEI_EP_EVENT_7		U(307)
-#define TEGRA_SDEI_EP_EVENT_8		U(308)
-#define TEGRA_SDEI_EP_EVENT_9		U(309)
-#define TEGRA_SDEI_EP_EVENT_10		U(310)
-#define TEGRA_SDEI_EP_EVENT_11		U(311)
-
-#endif /* PLATFORM_DEF_H */
+#endif /* __PLATFORM_DEF_H__ */

@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef IO_MEMMAP_H
-#define IO_MEMMAP_H
+#ifndef __IO_MEMMAP_H__
+#define __IO_MEMMAP_H__
 
 struct io_dev_connector;
 
 int register_io_dev_memmap(const struct io_dev_connector **dev_con);
 
-#endif /* IO_MEMMAP_H */
+#endif /* __IO_MEMMAP_H__ */

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SCU_H
-#define SCU_H
+#ifndef __SCU_H__
+#define __SCU_H__
 
 void disable_scu(unsigned long mpidr);
 void enable_scu(unsigned long mpidr);
 
-#endif /* SCU_H */
+#endif

@@ -1,21 +1,22 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <auth_common.h>
+#include <debug.h>
+#include <errno.h>
+#include <img_parser_mod.h>
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <common/debug.h>
-#include <drivers/auth/auth_common.h>
-#include <drivers/auth/img_parser_mod.h>
-#include <lib/utils_def.h>
-
-IMPORT_SYM(uintptr_t, __PARSER_LIB_DESCS_START__,	PARSER_LIB_DESCS_START);
-IMPORT_SYM(uintptr_t, __PARSER_LIB_DESCS_END__,		PARSER_LIB_DESCS_END);
+extern uintptr_t __PARSER_LIB_DESCS_START__;
+extern uintptr_t __PARSER_LIB_DESCS_END__;
+#define PARSER_LIB_DESCS_START	((uintptr_t) (&__PARSER_LIB_DESCS_START__))
+#define PARSER_LIB_DESCS_END	((uintptr_t) (&__PARSER_LIB_DESCS_END__))
 static unsigned int parser_lib_indices[IMG_MAX_TYPES];
 static img_parser_lib_desc_t *parser_lib_descs;
 

@@ -1,26 +1,29 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2019, NVIDIA CORPORATION.  All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
  */
 
-#include <arch_helpers.h>
+#include <mmio.h>
+#include <psci.h>
+#include <debug.h>
 #include <assert.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
 #include <errno.h>
-#include <lib/mmio.h>
-#include <lib/psci/psci.h>
 #include <se_private.h>
-#include <security_engine.h>
+#include <delay_timer.h>
+#include <arch_helpers.h>
 #include <tegra_platform.h>
+#include <security_engine.h>
 
 /*******************************************************************************
  * Constants and Macros
  ******************************************************************************/
 
-#define TIMEOUT_100MS		100U	/* Timeout in 100ms */
+#define TIMEOUT_1000MS		1000U	/* Timeout in 1000ms */
 #define RNG_AES_KEY_INDEX	1
 
 /*******************************************************************************
@@ -98,7 +101,7 @@ static tegra_se_dev_t se_dev_1 = {
 	/* Setup DST buffers for SE operations */
 	.dst_ll_buf = &se1_dst_ll_buf,
 	/* Setup context save destination */
-	.ctx_save_buf = (uint32_t *)&se1_ctx_buf
+	.ctx_save_buf = (uint32_t *)&se1_ctx_buf,
 };
 
 /* SE2 security engine device handle (T210B01 only) */
@@ -113,10 +116,8 @@ static tegra_se_dev_t se_dev_2 = {
 	/* Setup DST buffers for SE operations */
 	.dst_ll_buf = &se2_dst_ll_buf,
 	/* Setup context save destination */
-	.ctx_save_buf = (uint32_t *)(TEGRA_TZRAM_CARVEOUT_BASE + 0x1000)
+	.ctx_save_buf = (uint32_t *)(TEGRA_TZRAM_CARVEOUT_BASE + 0x1000),
 };
-
-static bool ecid_valid;
 
 /*******************************************************************************
  * Functions Definition
@@ -148,13 +149,13 @@ static int32_t tegra_se_operation_complete(const tegra_se_dev_t *se_dev)
 	/* Poll the SE interrupt register to ensure H/W operation complete */
 	val = tegra_se_read_32(se_dev, SE_INT_STATUS_REG_OFFSET);
 	for (timeout = 0; (SE_INT_OP_DONE(val) == SE_INT_OP_DONE_CLEAR) &&
-			(timeout < TIMEOUT_100MS); timeout++) {
+			(timeout < TIMEOUT_1000MS); timeout++) {
 		mdelay(1);
 		val = tegra_se_read_32(se_dev, SE_INT_STATUS_REG_OFFSET);
 	}
 
-	if (timeout == TIMEOUT_100MS) {
-		ERROR("%s: ERR: Atomic context save operation timeout!\n",
+	if (timeout == TIMEOUT_1000MS) {
+		ERROR("%s: ERR: Context save operation timeout!\n",
 				__func__);
 		ret = -ETIMEDOUT;
 	}
@@ -162,13 +163,13 @@ static int32_t tegra_se_operation_complete(const tegra_se_dev_t *se_dev)
 	/* Poll the SE status idle to ensure H/W operation complete */
 	if (ret == 0) {
 		val = tegra_se_read_32(se_dev, SE_STATUS_OFFSET);
-		for (timeout = 0; (val != 0U) && (timeout < TIMEOUT_100MS);
+		for (timeout = 0; (val != 0U) && (timeout < TIMEOUT_1000MS);
 				timeout++) {
 			mdelay(1);
 			val = tegra_se_read_32(se_dev, SE_STATUS_OFFSET);
 		}
 
-		if (timeout == TIMEOUT_100MS) {
+		if (timeout == TIMEOUT_1000MS) {
 			ERROR("%s: ERR: MEM_INTERFACE and SE state "
 					"idle state timeout.\n", __func__);
 			ret = -ETIMEDOUT;
@@ -179,12 +180,12 @@ static int32_t tegra_se_operation_complete(const tegra_se_dev_t *se_dev)
 	if (ret == 0) {
 		val = mmio_read_32(TEGRA_AHB_ARB_BASE + ARAHB_MEM_WRQUE_MST_ID_OFFSET);
 		for (timeout = 0; ((val & (ARAHB_MST_ID_SE_MASK | ARAHB_MST_ID_SE2_MASK)) != 0U) &&
-				(timeout < TIMEOUT_100MS); timeout++) {
+				(timeout < TIMEOUT_1000MS); timeout++) {
 			mdelay(1);
 			val = mmio_read_32(TEGRA_AHB_ARB_BASE + ARAHB_MEM_WRQUE_MST_ID_OFFSET);
 		}
 
-		if (timeout == TIMEOUT_100MS) {
+		if (timeout == TIMEOUT_1000MS) {
 			ERROR("%s: SE write over AHB timeout.\n", __func__);
 			ret = -ETIMEDOUT;
 		}
@@ -217,12 +218,12 @@ static int32_t tegra_se_operation_prepare(const tegra_se_dev_t *se_dev)
 
 	/* Wait for previous operation to finish */
 	val = tegra_se_read_32(se_dev, SE_STATUS_OFFSET);
-	for (timeout = 0; (val != 0U) && (timeout < TIMEOUT_100MS); timeout++) {
+	for (timeout = 0; (val != 0U) && (timeout < TIMEOUT_1000MS); timeout++) {
 		mdelay(1);
 		val = tegra_se_read_32(se_dev, SE_STATUS_OFFSET);
 	}
 
-	if (timeout == TIMEOUT_100MS) {
+	if (timeout == TIMEOUT_1000MS) {
 		ERROR("%s: ERR: SE status is not idle!\n", __func__);
 		ret = -ETIMEDOUT;
 	}
@@ -230,6 +231,11 @@ static int32_t tegra_se_operation_prepare(const tegra_se_dev_t *se_dev)
 	/* Clear any pending interrupts from  previous operation */
 	val = tegra_se_read_32(se_dev, SE_INT_STATUS_REG_OFFSET);
 	tegra_se_write_32(se_dev, SE_INT_STATUS_REG_OFFSET, val);
+
+	/* Clear errors from previous operation */
+	val = tegra_se_read_32(se_dev, SE_ERR_STATUS_REG_OFFSET);
+	tegra_se_write_32(se_dev, SE_ERR_STATUS_REG_OFFSET, val);
+
 	return ret;
 }
 
@@ -381,11 +387,10 @@ static int tegra_se_generate_srk(const tegra_se_dev_t *se_dev)
 	se_dev->dst_ll_buf->last_buff_num = 0;
 
 	/* Configure random number generator */
-	if (ecid_valid)
-		val = (DRBG_MODE_FORCE_INSTANTION | DRBG_SRC_ENTROPY);
-	else
-		val = (DRBG_MODE_FORCE_RESEED | DRBG_SRC_ENTROPY);
+	val = (DRBG_MODE_FORCE_RESEED | DRBG_SRC_ENTROPY);
 	tegra_se_write_32(se_dev, SE_RNG_CONFIG_REG_OFFSET, val);
+	tegra_se_write_32(se_dev, SE_RNG_RESEED_INTERVAL_REG_OFFSET,
+		RNG_RESEED_INTERVAL);
 
 	/* Configure output destination = SRK */
 	val = (SE_CONFIG_ENC_ALG_RNG |
@@ -394,7 +399,7 @@ static int tegra_se_generate_srk(const tegra_se_dev_t *se_dev)
 	tegra_se_write_32(se_dev, SE_CONFIG_REG_OFFSET, val);
 
 	/* Perform hardware operation */
-	ret = tegra_se_start_normal_operation(se_dev, 0);
+	ret = tegra_se_start_normal_operation(se_dev, SE_CTX_SAVE_RANDOM_DATA_SIZE);
 
 	return ret;
 }
@@ -446,10 +451,7 @@ static int tegra_se_lp_generate_random_data(tegra_se_dev_t *se_dev)
 	tegra_se_write_32(se_dev, SE_CRYPTO_REG_OFFSET, val);
 
 	/* Configure RNG */
-	if (ecid_valid)
-		val = (DRBG_MODE_FORCE_INSTANTION | DRBG_SRC_LFSR);
-	else
-		val = (DRBG_MODE_FORCE_RESEED | DRBG_SRC_LFSR);
+	val = (DRBG_MODE_FORCE_INSTANTION | DRBG_SRC_LFSR);
 	tegra_se_write_32(se_dev, SE_RNG_CONFIG_REG_OFFSET, val);
 
 	/* SE normal operation */
@@ -572,11 +574,30 @@ static int tegra_se_aeskeytable_context_save(tegra_se_dev_t *se_dev)
 			se_dev->dst_ll_buf->buffer[0].addr += TEGRA_SE_KEY_128_SIZE;
 		}
 
-		/* OIV context save */
+	}
+
+aes_keytable_save_err:
+	return ret;
+}
+
+static int tegra_se_original_iv_context_save(tegra_se_dev_t *se_dev)
+{
+	uint32_t val = 0;
+	int ret = 0;
+
+	se_dev->dst_ll_buf->last_buff_num = 0;
+	if (!se_dev->ctx_save_buf) {
+		ERROR("%s: ERR: context save buffer NULL pointer!\n", __func__);
+		ret = -EINVAL;
+		goto aes_oiv_save_err;
+	}
+
+	/* AES Original IV context save */
+	for (int slot = 0; slot < TEGRA_SE_AES_KEYSLOT_COUNT; slot++) {
 		se_dev->dst_ll_buf->last_buff_num = 0;
 		se_dev->dst_ll_buf->buffer[0].addr = ((uint64_t)(&(
-						((tegra_se_context_t *)se_dev->
-						 ctx_save_buf)->key_slots[slot].oiv)));
+					((tegra_se_context_t *)se_dev->
+					ctx_save_buf)->key_oiv[slot].iv)));
 		se_dev->dst_ll_buf->buffer[0].data_len = TEGRA_SE_AES_IV_SIZE;
 
 		val = SE_CTX_SAVE_SRC_AES_KEYTABLE |
@@ -587,16 +608,34 @@ static int tegra_se_aeskeytable_context_save(tegra_se_dev_t *se_dev)
 		/* SE context save operation */
 		ret = tegra_se_start_ctx_save_operation(se_dev, TEGRA_SE_AES_IV_SIZE);
 		if (ret) {
-			ERROR("%s: ERR: OIV CTX_SAVE OP failed, slot=%d.\n",
+			ERROR("%s: ERR: Original IV CTX_SAVE OP failed, slot=%d.\n",
 					__func__, slot);
-			goto aes_keytable_save_err;
+			goto aes_oiv_save_err;
 		}
+	}
 
-		/* UIV context save */
+aes_oiv_save_err:
+	return ret;
+}
+
+static int tegra_se_updated_iv_context_save(tegra_se_dev_t *se_dev)
+{
+	uint32_t val = 0;
+	int ret = 0;
+
+	se_dev->dst_ll_buf->last_buff_num = 0;
+	if (!se_dev->ctx_save_buf) {
+		ERROR("%s: ERR: context save buffer NULL pointer!\n", __func__);
+		ret = -EINVAL;
+		goto aes_uiv_save_err;
+	}
+
+	/* AES Updated IV context save */
+	for (int slot = 0; slot < TEGRA_SE_AES_KEYSLOT_COUNT; slot++) {
 		se_dev->dst_ll_buf->last_buff_num = 0;
 		se_dev->dst_ll_buf->buffer[0].addr = ((uint64_t)(&(
-						((tegra_se_context_t *)se_dev->
-						 ctx_save_buf)->key_slots[slot].uiv)));
+					((tegra_se_context_t *)se_dev->
+					ctx_save_buf)->key_uiv[slot].iv)));
 		se_dev->dst_ll_buf->buffer[0].data_len = TEGRA_SE_AES_IV_SIZE;
 
 		val = SE_CTX_SAVE_SRC_AES_KEYTABLE |
@@ -607,13 +646,13 @@ static int tegra_se_aeskeytable_context_save(tegra_se_dev_t *se_dev)
 		/* SE context save operation */
 		ret = tegra_se_start_ctx_save_operation(se_dev, TEGRA_SE_AES_IV_SIZE);
 		if (ret) {
-			ERROR("%s: ERR: UIV CTX_SAVE OP failed, slot=%d\n",
+			ERROR("%s: ERR: Updated IV CTX_SAVE OP failed, slot=%d.\n",
 					__func__, slot);
-			goto aes_keytable_save_err;
+			goto aes_uiv_save_err;
 		}
 	}
 
-aes_keytable_save_err:
+aes_uiv_save_err:
 	return ret;
 }
 
@@ -820,6 +859,22 @@ static int tegra_se_context_save_sw(tegra_se_dev_t *se_dev)
 		return err;
 	}
 
+	INFO("%s: save AES original iv\n", __func__);
+	/* Save AES Original IV context */
+	err = tegra_se_original_iv_context_save(se_dev);
+	if (err) {
+		ERROR("%s: ERR: LP AES Original IV save failed\n", __func__);
+		return err;
+	}
+
+	INFO("%s: save AES updated iv\n", __func__);
+	/* Save AES Updated IV context */
+	err = tegra_se_updated_iv_context_save(se_dev);
+	if (err) {
+		ERROR("%s: ERR: LP AES Updated IV save failed\n", __func__);
+		return err;
+	}
+
 	/* RSA key slot table context save */
 	INFO("%s: save RSA keytables\n", __func__);
 	err = tegra_se_lp_rsakeytable_context_save(se_dev);
@@ -896,7 +951,6 @@ static int tegra_se_context_save_sw(tegra_se_dev_t *se_dev)
  */
 void tegra_se_init(void)
 {
-	uint32_t val = 0;
 	INFO("%s: start SE init\n", __func__);
 
 	/* Generate random SRK to initialize DRBG */
@@ -906,26 +960,20 @@ void tegra_se_init(void)
 		tegra_se_generate_srk(&se_dev_2);
 	}
 
-	/* determine if ECID is valid */
-	val = mmio_read_32(TEGRA_FUSE_BASE + FUSE_JTAG_SECUREID_VALID);
-	ecid_valid = (val == ECID_VALID);
-
 	INFO("%s: SE init done\n", __func__);
 }
 
-static void tegra_se_enable_clocks(void)
+static int32_t tegra_se_enable_clocks(void)
 {
 	uint32_t val = 0;
 
-	/* Enable entropy clock */
-	val = mmio_read_32(TEGRA_CAR_RESET_BASE + TEGRA_CLK_OUT_ENB_W);
-	val |= ENTROPY_CLK_ENB_BIT;
-	mmio_write_32(TEGRA_CAR_RESET_BASE + TEGRA_CLK_OUT_ENB_W, val);
 
-	/* De-Assert Entropy Reset */
-	val = mmio_read_32(TEGRA_CAR_RESET_BASE + TEGRA_RST_DEVICES_W);
-	val &= ~ENTROPY_RESET_BIT;
-	mmio_write_32(TEGRA_CAR_RESET_BASE + TEGRA_RST_DEVICES_W, val);
+	/* Check if Entropy clock is enabled or not */
+	val = mmio_read_32(TEGRA_CAR_RESET_BASE + TEGRA_CLK_OUT_ENB_W);
+	if ( !(val & ENTROPY_CLK_ENB_BIT)) {
+		ERROR("%s: Entropy clock is not enabled\n", __func__);
+		return -ENXIO;
+	}
 
 	/*
 	 * Switch SE clock source to CLK_M, to make sure SE clock
@@ -943,16 +991,13 @@ static void tegra_se_enable_clocks(void)
 	val = mmio_read_32(TEGRA_CAR_RESET_BASE + TEGRA_RST_DEVICES_V);
 	val &= ~SE_RESET_BIT;
 	mmio_write_32(TEGRA_CAR_RESET_BASE + TEGRA_RST_DEVICES_V, val);
+
+	return 0;
 }
 
 static void tegra_se_disable_clocks(void)
 {
 	uint32_t val = 0;
-
-	/* Disable entropy clock */
-	val = mmio_read_32(TEGRA_CAR_RESET_BASE + TEGRA_CLK_OUT_ENB_W);
-	val &= ~ENTROPY_CLK_ENB_BIT;
-	mmio_write_32(TEGRA_CAR_RESET_BASE + TEGRA_CLK_OUT_ENB_W, val);
 
 	/* Disable SE clock */
 	val = mmio_read_32(TEGRA_CAR_RESET_BASE + TEGRA_CLK_OUT_ENB_V);
@@ -975,7 +1020,11 @@ int32_t tegra_se_suspend(void)
 	val &= ~PPCS_SMMU_ENABLE;
 	mmio_write_32(TEGRA_MC_BASE + MC_SMMU_PPCS_ASID_0, val);
 
-	tegra_se_enable_clocks();
+	ret = tegra_se_enable_clocks();
+	if (ret != 0) {
+		ERROR("%s: SE ctx save failed (%d)\n", __func__, ret);
+		return ret;
+	}
 
 	if (tegra_chipid_is_t210_b01()) {
 		/* It is T210 B01, Atomic context save se2 and pka1 */
@@ -1013,19 +1062,21 @@ int32_t tegra_se_save_tzram(void)
 	uint32_t timeout;
 
 	INFO("%s: SE TZRAM save start\n", __func__);
-	tegra_se_enable_clocks();
+	ret = tegra_se_enable_clocks();
+	if (ret != 0)
+		return ret;
 
 	val = (SE_TZRAM_OP_REQ_INIT | SE_TZRAM_OP_MODE_SAVE);
 	tegra_se_write_32(&se_dev_1, SE_TZRAM_OPERATION, val);
 
 	val = tegra_se_read_32(&se_dev_1, SE_TZRAM_OPERATION);
 	for (timeout = 0; (SE_TZRAM_OP_BUSY(val) == SE_TZRAM_OP_BUSY_ON) &&
-			(timeout < TIMEOUT_100MS); timeout++) {
+			(timeout < TIMEOUT_1000MS); timeout++) {
 		mdelay(1);
 		val = tegra_se_read_32(&se_dev_1, SE_TZRAM_OPERATION);
 	}
 
-	if (timeout == TIMEOUT_100MS) {
+	if (timeout == TIMEOUT_1000MS) {
 		ERROR("%s: ERR: TZRAM save timeout!\n", __func__);
 		ret = -ETIMEDOUT;
 	}

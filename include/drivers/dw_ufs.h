@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef DW_UFS_H
-#define DW_UFS_H
+#ifndef __DW_UFS_H__
+#define __DW_UFS_H__
 
-#include <stdint.h>
+#include <sys/types.h>
 
 /* Bus Throtting */
 #define BUSTHRTL				0xC0
@@ -107,4 +107,4 @@ typedef struct dw_ufs_params {
 
 int dw_ufs_init(dw_ufs_params_t *params);
 
-#endif /* DW_UFS_H */
+#endif /* __DW_UFS_H__ */

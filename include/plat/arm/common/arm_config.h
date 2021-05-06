@@ -1,30 +1,21 @@
 /*
- * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef ARM_CONFIG_H
-#define ARM_CONFIG_H
+#ifndef __ARM_CONFIG_H__
+#define __ARM_CONFIG_H__
 
 #include <stdint.h>
 
-#include <lib/utils_def.h>
-
-/* Whether Base memory map is in use */
-#define ARM_CONFIG_BASE_MMAP		BIT(1)
-
-/* Whether TZC should be configured */
-#define ARM_CONFIG_HAS_TZC		BIT(2)
-
-/* FVP model has shifted affinity */
-#define ARM_CONFIG_FVP_SHIFTED_AFF	BIT(3)
-
-/* FVP model has SMMUv3 affinity */
-#define ARM_CONFIG_FVP_HAS_SMMUV3	BIT(4)
-
-/* FVP model has CCI (400 or 500/550) devices */
-#define ARM_CONFIG_FVP_HAS_CCI400	BIT(5)
-#define ARM_CONFIG_FVP_HAS_CCI5XX	BIT(6)
+enum arm_config_flags {
+	/* Whether Base memory map is in use */
+	ARM_CONFIG_BASE_MMAP		= 0x1,
+	/* Whether interconnect should be enabled */
+	ARM_CONFIG_HAS_INTERCONNECT	= 0x2,
+	/* Whether TZC should be configured */
+	ARM_CONFIG_HAS_TZC		= 0x4
+};
 
 typedef struct arm_config {
 	unsigned long flags;
@@ -40,4 +31,4 @@ static inline const arm_config_t *get_arm_config(void)
 }
 
 
-#endif /* ARM_CONFIG_H */
+#endif /* __ARM_CONFIG_H__ */

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SOC_H
-#define SOC_H
+#ifndef __SOC_H__
+#define __SOC_H__
 
 /******************************* stimer ***************************************/
 #define TIMER_LOADE_COUNT0	0x00
@@ -15,6 +15,8 @@
 #define TIMER_CONTROL_REG	0x10
 #define TIMER_INTSTATUS		0x18
 #define TIMER_EN		0x1
+
+extern const unsigned char rockchip_power_domain_tree_desc[];
 
 /**************************** read/write **************************************/
 #ifndef BITS_WMSK
@@ -108,4 +110,4 @@ enum plls_id {
 #define GPIO2_D2_GPIO_MODE	0x30
 #define GRF_GPIO2D_IOMUX	0x34
 
-#endif /* SOC_H */
+#endif /* __SOC_H__ */

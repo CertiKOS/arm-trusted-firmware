@@ -1,28 +1,21 @@
 /*
  * Copyright (c) 2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <bl_common.h>
+#include <gicv2.h>
 #include <platform_def.h>
-
-#include <common/bl_common.h>
-#include <drivers/arm/gicv2.h>
-#include <lib/utils.h>
-#include <plat/common/platform.h>
-
 #include <tegra_private.h>
 #include <tegra_def.h>
-
-static unsigned int tegra_target_masks[PLATFORM_CORE_COUNT];
+#include <utils.h>
 
 /******************************************************************************
  * Tegra common helper to setup the GICv2 driver data.
  *****************************************************************************/
-void tegra_gic_setup(const interrupt_prop_t *interrupt_props,
-		     unsigned int interrupt_props_num)
+void tegra_gic_setup(tegra_gic_cfg_t *cfg)
 {
 	/*
 	 * Tegra GIC configuration settings
@@ -34,10 +27,8 @@ void tegra_gic_setup(const interrupt_prop_t *interrupt_props,
 	 */
 	tegra_gic_data.gicd_base = TEGRA_GICD_BASE;
 	tegra_gic_data.gicc_base = TEGRA_GICC_BASE;
-	tegra_gic_data.interrupt_props = interrupt_props;
-	tegra_gic_data.interrupt_props_num = interrupt_props_num;
-	tegra_gic_data.target_masks = tegra_target_masks;
-	tegra_gic_data.target_masks_num = ARRAY_SIZE(tegra_target_masks);
+	tegra_gic_data.g0_interrupt_num = cfg->g0_int_num;
+	tegra_gic_data.g0_interrupt_array = cfg->g0_int_array;
 	gicv2_driver_init(&tegra_gic_data);
 }
 
@@ -48,7 +39,6 @@ void tegra_gic_init(void)
 {
 	gicv2_distif_init();
 	gicv2_pcpu_distif_init();
-	gicv2_set_pe_target_mask(plat_my_core_pos());
 	gicv2_cpuif_enable();
 }
 
@@ -67,6 +57,5 @@ void tegra_gic_cpuif_deactivate(void)
 void tegra_gic_pcpu_init(void)
 {
 	gicv2_pcpu_distif_init();
-	gicv2_set_pe_target_mask(plat_my_core_pos());
 	gicv2_cpuif_enable();
 }

@@ -1,45 +1,26 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
+#include <debug.h>
 #include <platform_def.h>
+#include <xlat_tables_v2.h>
 
-#include <common/debug.h>
-#include <lib/xlat_tables/xlat_tables_v2.h>
-#include <plat/common/platform.h>
+#define UNIPHIER_OCM_REGION_BASE	0x30000000
+#define UNIPHIER_OCM_REGION_SIZE	0x00040000
 
-#include "uniphier.h"
+#define UNIPHIER_REG_REGION_BASE	0x50000000
+#define UNIPHIER_REG_REGION_SIZE	0x20000000
 
-struct uniphier_reg_region {
-	uintptr_t base;
-	size_t size;
-};
-
-static const struct uniphier_reg_region uniphier_reg_region[] = {
-	[UNIPHIER_SOC_LD11] = {
-		.base = 0x50000000UL,
-		.size = 0x20000000UL,
-	},
-	[UNIPHIER_SOC_LD20] = {
-		.base = 0x50000000UL,
-		.size = 0x20000000UL,
-	},
-	[UNIPHIER_SOC_PXS3] = {
-		.base = 0x50000000UL,
-		.size = 0x20000000UL,
-	},
-};
-
-void uniphier_mmap_setup(unsigned int soc)
+void uniphier_mmap_setup(uintptr_t total_base, size_t total_size,
+			 const struct mmap_region *mmap)
 {
 	VERBOSE("Trusted RAM seen by this BL image: %p - %p\n",
-		(void *)BL_CODE_BASE, (void *)BL_END);
-	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE,
-			round_up(BL_END, PAGE_SIZE) - BL_CODE_BASE,
+		(void *)total_base, (void *)(total_base + total_size));
+	mmap_add_region(total_base, total_base,
+			total_size,
 			MT_MEMORY | MT_RW | MT_SECURE);
 
 	/* remap the code section */
@@ -56,26 +37,23 @@ void uniphier_mmap_setup(unsigned int soc)
 			BL_COHERENT_RAM_END - BL_COHERENT_RAM_BASE,
 			MT_DEVICE | MT_RW | MT_SECURE);
 
-	/* register region */
-	assert(soc < ARRAY_SIZE(uniphier_reg_region));
-	mmap_add_region(uniphier_reg_region[soc].base,
-			uniphier_reg_region[soc].base,
-			uniphier_reg_region[soc].size,
+	/*
+	 * on-chip SRAM region: should be DEVICE attribute because the USB
+	 * load functions provided by the ROM use this memory region as a work
+	 * area, but do not cater to cache coherency.
+	 */
+	mmap_add_region(UNIPHIER_OCM_REGION_BASE, UNIPHIER_OCM_REGION_BASE,
+			UNIPHIER_OCM_REGION_SIZE,
 			MT_DEVICE | MT_RW | MT_SECURE);
 
+	/* register region */
+	mmap_add_region(UNIPHIER_REG_REGION_BASE, UNIPHIER_REG_REGION_BASE,
+			UNIPHIER_REG_REGION_SIZE,
+			MT_DEVICE | MT_RW | MT_SECURE);
+
+	/* additional regions if needed */
+	if (mmap)
+		mmap_add(mmap);
+
 	init_xlat_tables();
-
-	enable_mmu(0);
-
-#if PLAT_RO_XLAT_TABLES
-	{
-		int ret;
-
-		ret = xlat_make_tables_readonly();
-		if (ret) {
-			ERROR("Failed to make translation tables read-only.");
-			plat_error_handler(ret);
-		}
-	}
-#endif
 }

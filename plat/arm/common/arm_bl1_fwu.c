@@ -1,20 +1,17 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <bl_common.h>
+#include <debug.h>
 #include <errno.h>
-
+#include <plat_arm.h>
 #include <platform_def.h>
-
-#include <bl1/tbbr/tbbr_img_desc.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <lib/utils.h>
-#include <plat/arm/common/plat_arm.h>
-#include <plat/common/platform.h>
+#include <tbbr_img_desc.h>
+#include <utils.h>
 
 /* Struct to keep track of usable memory */
 typedef struct bl1_mem_info {
@@ -22,7 +19,7 @@ typedef struct bl1_mem_info {
 	unsigned int mem_size;
 } bl1_mem_info_t;
 
-static bl1_mem_info_t fwu_addr_map_secure[] = {
+bl1_mem_info_t fwu_addr_map_secure[] = {
 	{
 		.mem_base = ARM_SHARED_RAM_BASE,
 		.mem_size = ARM_SHARED_RAM_SIZE
@@ -32,7 +29,7 @@ static bl1_mem_info_t fwu_addr_map_secure[] = {
 	}
 };
 
-static bl1_mem_info_t fwu_addr_map_non_secure[] = {
+bl1_mem_info_t fwu_addr_map_non_secure[] = {
 	{
 		.mem_base = ARM_NS_DRAM1_BASE,
 		.mem_size = ARM_NS_DRAM1_SIZE

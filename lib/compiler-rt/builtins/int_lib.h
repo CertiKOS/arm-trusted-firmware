@@ -14,7 +14,7 @@
  */
 
 /*
- * Portions copyright (c) 2017-2018, ARM Limited and Contributors.
+ * Portions copyright (c) 2017, ARM Limited and Contributors.
  * All rights reserved.
  */
 
@@ -27,28 +27,27 @@
 
 #if defined(__ELF__)
 #define FNALIAS(alias_name, original_name) \
-  void alias_name() __attribute__((__alias__(#original_name)))
-#define COMPILER_RT_ALIAS(aliasee) __attribute__((__alias__(#aliasee)))
+  void alias_name() __attribute__((alias(#original_name)))
 #else
 #define FNALIAS(alias, name) _Pragma("GCC error(\"alias unsupported on this file format\")")
-#define COMPILER_RT_ALIAS(aliasee) _Pragma("GCC error(\"alias unsupported on this file format\")")
 #endif
 
 /* ABI macro definitions */
 
 #if __ARM_EABI__
+# define ARM_EABI_FNALIAS(aeabi_name, name)         \
+  void __aeabi_##aeabi_name() __attribute__((alias("__" #name)));
 # ifdef COMPILER_RT_ARMHF_TARGET
 #   define COMPILER_RT_ABI
 # else
-#   define COMPILER_RT_ABI __attribute__((__pcs__("aapcs")))
+#   define COMPILER_RT_ABI __attribute__((pcs("aapcs")))
 # endif
 #else
+# define ARM_EABI_FNALIAS(aeabi_name, name)
 # define COMPILER_RT_ABI
 #endif
 
-#define AEABI_RTABI __attribute__((__pcs__("aapcs")))
-
-#if defined(_MSC_VER) && !defined(__clang__)
+#ifdef _MSC_VER
 #define ALWAYS_INLINE __forceinline
 #define NOINLINE __declspec(noinline)
 #define NORETURN __declspec(noreturn)
@@ -64,8 +63,9 @@
  * Kernel and boot environment can't use normal headers,
  * so use the equivalent system headers.
  */
-#  include <limits.h>
-#  include <stdint.h>
+#  include <sys/limits.h>
+#  include <sys/stdint.h>
+#  include <sys/types.h>
 
 /* Include the commonly used internal type definitions. */
 #include "int_types.h"

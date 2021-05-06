@@ -1,14 +1,14 @@
 /*
- * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef PLAT_MACROS_S
-#define PLAT_MACROS_S
+#ifndef __PLAT_MACROS_S__
+#define __PLAT_MACROS_S__
 
 #include <arm_macros.S>
 #include <cci_macros.S>
-#include "zynqmp_def.h"
+#include "../zynqmp_def.h"
 
 	/* ---------------------------------------------
 	 * The below required platform porting macro
@@ -25,4 +25,4 @@
 	print_cci_regs
 	.endm
 
-#endif /* PLAT_MACROS_S */
+#endif /* __PLAT_MACROS_S__ */

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef CCN_PRIVATE_H
-#define CCN_PRIVATE_H
+#ifndef __CCN_PRIVATE_H__
+#define __CCN_PRIVATE_H__
 
 /*
  * A CCN implementation can have a maximum of 64 Request nodes with node IDs
@@ -134,13 +134,13 @@ typedef enum rn_types {
 #define HNF_SAM_CTRL_SN1_ID_SHIFT	8
 #define HNF_SAM_CTRL_SN2_ID_SHIFT	16
 
-#define HNF_SAM_CTRL_TAB0_MASK		ULL(0x3f)
+#define HNF_SAM_CTRL_TAB0_MASK		0x3fUL
 #define HNF_SAM_CTRL_TAB0_SHIFT		48
-#define HNF_SAM_CTRL_TAB1_MASK		ULL(0x3f)
+#define HNF_SAM_CTRL_TAB1_MASK		0x3fUL
 #define HNF_SAM_CTRL_TAB1_SHIFT		56
 
 #define HNF_SAM_CTRL_3SN_ENB_SHIFT	32
-#define HNF_SAM_CTRL_3SN_ENB_MASK	ULL(0x01)
+#define HNF_SAM_CTRL_3SN_ENB_MASK	0x01UL
 
 /*
  * Macro to create a value suitable for programming into a HNF SAM Control
@@ -169,7 +169,7 @@ typedef enum rn_types {
 #define FOR_EACH_BIT(bit_pos, bit_map)			\
 	for (bit_pos = __builtin_ctzll(bit_map);	\
 	     bit_map;					\
-	     bit_map &= ~(1ULL << (bit_pos)),		\
+	     bit_map &= ~(1UL << bit_pos),		\
 	     bit_pos = __builtin_ctzll(bit_map))
 
 /*
@@ -230,4 +230,4 @@ static inline unsigned int count_set_bits(unsigned long long bitmap)
 #define CCN_GET_HN_NODEID_MAP(periphbase, mn_hn_id_reg_offset)		\
 	ccn_reg_read(periphbase, MN_REGION_ID, mn_hn_id_reg_offset)
 
-#endif /* CCN_PRIVATE_H */
+#endif /* __CCN_PRIVATE_H__ */

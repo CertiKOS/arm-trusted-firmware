@@ -1,15 +1,17 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2017, NVIDIA CORPORATION.  All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
  */
 
-#ifndef SE_H
-#define SE_H
+#ifndef __SE_H__
+#define __SE_H__
 
-int32_t tegra_se_calculate_save_sha256(uint64_t src_addr,
-						uint32_t src_len_inbyte);
 int32_t tegra_se_suspend(void);
 void tegra_se_resume(void);
 
-#endif /* SE_H */
+#endif /* __SE_H__ */

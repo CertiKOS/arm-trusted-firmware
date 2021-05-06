@@ -4,19 +4,17 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef HISI_PWRC_H
-#define HISI_PWRC_H
+#ifndef __HISI_PWRC_H__
+#define __HISI_PWRC_H__
 
-#ifndef __ASSEMBLER__
+#ifndef __ASSEMBLY__
 
 void hisi_pwrc_set_cluster_wfi(unsigned int id);
 void hisi_pwrc_set_core_bx_addr(unsigned int core,
 				unsigned int cluster,
 				uintptr_t entry_point);
-void hisi_pwrc_enable_debug(unsigned int core,
-			    unsigned int cluster);
 int hisi_pwrc_setup(void);
 
-#endif /*__ASSEMBLER__*/
+#endif /*__ASSEMBLY__*/
 
-#endif /* HISI_PWRC_H */
+#endif /* __HISI_PWRC_H__ */

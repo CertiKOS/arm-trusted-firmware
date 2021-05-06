@@ -1,39 +1,29 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <arch.h>
+#include <arch_helpers.h>
 #include <assert.h>
+#include <bl_common.h>
+#include <console.h>
+#include <context.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <platform.h>
+#include <platform_def.h>
+#include <platform_sp_min.h>
+#include <psci.h>
+#include <runtime_svc.h>
+#include <smccc_helpers.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <platform_def.h>
-
-#include <arch.h>
-#include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <context.h>
-#include <drivers/console.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/pmf/pmf.h>
-#include <lib/psci/psci.h>
-#include <lib/runtime_instr.h>
-#include <lib/utils.h>
-#include <plat/common/platform.h>
-#include <platform_sp_min.h>
-#include <services/std_svc.h>
-#include <smccc_helpers.h>
-
+#include <types.h>
+#include <utils.h>
 #include "sp_min_private.h"
-
-#if ENABLE_RUNTIME_INSTRUMENTATION
-PMF_REGISTER_SERVICE_SMC(rt_instr_svc, PMF_RT_INSTR_SVC_ID,
-	RT_INSTR_TOTAL_IDS, PMF_STORE_ENABLE)
-#endif
 
 /* Pointers to per-core cpu contexts */
 static void *sp_min_cpu_ctx_ptr[PLATFORM_CORE_COUNT];
@@ -42,15 +32,15 @@ static void *sp_min_cpu_ctx_ptr[PLATFORM_CORE_COUNT];
 static smc_ctx_t sp_min_smc_context[PLATFORM_CORE_COUNT];
 
 /******************************************************************************
- * Define the smccc helper library APIs
+ * Define the smccc helper library API's
  *****************************************************************************/
-void *smc_get_ctx(unsigned int security_state)
+void *smc_get_ctx(int security_state)
 {
 	assert(security_state == NON_SECURE);
 	return &sp_min_smc_context[plat_my_core_pos()];
 }
 
-void smc_set_next_ctx(unsigned int security_state)
+void smc_set_next_ctx(int security_state)
 {
 	assert(security_state == NON_SECURE);
 	/* SP_MIN stores only non secure smc context. Nothing to do here */
@@ -110,8 +100,6 @@ static void copy_cpu_ctx_to_smc_stx(const regs_t *cpu_reg_ctx,
 				smc_ctx_t *next_smc_ctx)
 {
 	next_smc_ctx->r0 = read_ctx_reg(cpu_reg_ctx, CTX_GPREG_R0);
-	next_smc_ctx->r1 = read_ctx_reg(cpu_reg_ctx, CTX_GPREG_R1);
-	next_smc_ctx->r2 = read_ctx_reg(cpu_reg_ctx, CTX_GPREG_R2);
 	next_smc_ctx->lr_mon = read_ctx_reg(cpu_reg_ctx, CTX_LR);
 	next_smc_ctx->spsr_mon = read_ctx_reg(cpu_reg_ctx, CTX_SPSR);
 	next_smc_ctx->scr = read_ctx_reg(cpu_reg_ctx, CTX_SCR);
@@ -160,7 +148,7 @@ static void sp_min_prepare_next_image_entry(void)
 uintptr_t get_arm_std_svc_args(unsigned int svc_mask)
 {
 	/* Setup the arguments for PSCI Library */
-	DEFINE_STATIC_PSCI_LIB_ARGS_V1(psci_args, sp_min_warm_entrypoint);
+	DEFINE_STATIC_PSCI_LIB_ARGS_V1(psci_args, (uintptr_t)sp_min_warm_entrypoint);
 
 	/* PSCI is the only ARM Standard Service implemented */
 	assert(svc_mask == PSCI_FID_MASK);
@@ -208,8 +196,6 @@ void sp_min_main(void)
 void sp_min_warm_boot(void)
 {
 	smc_ctx_t *next_smc_ctx;
-	cpu_context_t *ctx = cm_get_context(NON_SECURE);
-	u_register_t ns_sctlr;
 
 	psci_warmboot_entrypoint();
 
@@ -220,30 +206,4 @@ void sp_min_warm_boot(void)
 
 	copy_cpu_ctx_to_smc_stx(get_regs_ctx(cm_get_context(NON_SECURE)),
 			next_smc_ctx);
-
-	/* Temporarily set the NS bit to access NS SCTLR */
-	write_scr(read_scr() | SCR_NS_BIT);
-	isb();
-	ns_sctlr = read_ctx_reg(get_regs_ctx(ctx), CTX_NS_SCTLR);
-	write_sctlr(ns_sctlr);
-	isb();
-
-	write_scr(read_scr() & ~SCR_NS_BIT);
-	isb();
 }
-
-#if SP_MIN_WITH_SECURE_FIQ
-/******************************************************************************
- * This function is invoked on secure interrupts. By construction of the
- * SP_MIN, secure interrupts can only be handled when core executes in non
- * secure state.
- *****************************************************************************/
-void sp_min_fiq(void)
-{
-	uint32_t id;
-
-	id = plat_ic_acknowledge_interrupt();
-	sp_min_plat_fiq_handler(id);
-	plat_ic_end_of_interrupt(id);
-}
-#endif /* SP_MIN_WITH_SECURE_FIQ */

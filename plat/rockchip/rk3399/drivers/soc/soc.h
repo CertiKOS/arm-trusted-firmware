@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SOC_H
-#define SOC_H
+#ifndef __SOC_H__
+#define __SOC_H__
 
-#include <lib/utils.h>
+#include <utils.h>
 
 #define GLB_SRST_FST_CFG_VAL	0xfdb9
 #define GLB_SRST_SND_CFG_VAL	0xeca8
@@ -56,43 +56,6 @@
 #define PMUCRU_GATE_CON(n)	(0x100 + (n) * 4)
 #define CRU_GATE_CON(n)	(0x300 + (n) * 4)
 
-#define PMUCRU_RSTNHOLD_CON0	0x120
-enum {
-	PRESETN_NOC_PMU_HOLD = 1,
-	PRESETN_INTMEM_PMU_HOLD,
-	HRESETN_CM0S_PMU_HOLD,
-	HRESETN_CM0S_NOC_PMU_HOLD,
-	DRESETN_CM0S_PMU_HOLD,
-	POESETN_CM0S_PMU_HOLD,
-	PRESETN_SPI3_HOLD,
-	RESETN_SPI3_HOLD,
-	PRESETN_TIMER_PMU_0_1_HOLD,
-	RESETN_TIMER_PMU_0_HOLD,
-	RESETN_TIMER_PMU_1_HOLD,
-	PRESETN_UART_M0_PMU_HOLD,
-	RESETN_UART_M0_PMU_HOLD,
-	PRESETN_WDT_PMU_HOLD
-};
-
-#define PMUCRU_RSTNHOLD_CON1	0x124
-enum {
-	PRESETN_I2C0_HOLD,
-	PRESETN_I2C4_HOLD,
-	PRESETN_I2C8_HOLD,
-	PRESETN_MAILBOX_PMU_HOLD,
-	PRESETN_RKPWM_PMU_HOLD,
-	PRESETN_PMUGRF_HOLD,
-	PRESETN_SGRF_HOLD,
-	PRESETN_GPIO0_HOLD,
-	PRESETN_GPIO1_HOLD,
-	PRESETN_CRU_PMU_HOLD,
-	PRESETN_INTR_ARB_HOLD,
-	PRESETN_PVTM_PMU_HOLD,
-	RESETN_I2C0_HOLD,
-	RESETN_I2C4_HOLD,
-	RESETN_I2C8_HOLD
-};
-
 enum plls_id {
 	ALPLL_ID = 0,
 	ABPLL_ID,
@@ -134,11 +97,6 @@ struct deepsleep_data_s {
 	uint32_t plls_con[END_PLL_ID][PLL_CON_COUNT];
 	uint32_t cru_gate_con[CRU_GATE_COUNT];
 	uint32_t pmucru_gate_con[PMUCRU_GATE_COUNT];
-};
-
-struct pmu_sleep_data {
-	uint32_t pmucru_rstnhold_con0;
-	uint32_t pmucru_rstnhold_con1;
 };
 
 /**************************************************
@@ -231,40 +189,39 @@ struct pmu_sleep_data {
 #define PWM_ENABLE			(1 << 0)
 
 /* grf reg offset */
-#define GRF_USBPHY0_CTRL0	0x4480
-#define GRF_USBPHY0_CTRL2	0x4488
-#define GRF_USBPHY0_CTRL3	0x448c
-#define GRF_USBPHY0_CTRL12	0x44b0
-#define GRF_USBPHY0_CTRL13	0x44b4
-#define GRF_USBPHY0_CTRL15	0x44bc
-#define GRF_USBPHY0_CTRL16	0x44c0
-
-#define GRF_USBPHY1_CTRL0	0x4500
-#define GRF_USBPHY1_CTRL2	0x4508
-#define GRF_USBPHY1_CTRL3	0x450c
-#define GRF_USBPHY1_CTRL12	0x4530
-#define GRF_USBPHY1_CTRL13	0x4534
-#define GRF_USBPHY1_CTRL15	0x453c
-#define GRF_USBPHY1_CTRL16	0x4540
-
-#define GRF_GPIO2A_IOMUX	0xe000
-#define GRF_GPIO2D_HE		0xe18c
 #define GRF_DDRC0_CON0		0xe380
 #define GRF_DDRC0_CON1		0xe384
 #define GRF_DDRC1_CON0		0xe388
 #define GRF_DDRC1_CON1		0xe38c
 #define GRF_SOC_CON_BASE	0xe200
 #define GRF_SOC_CON(n)		(GRF_SOC_CON_BASE + (n) * 4)
-#define GRF_IO_VSEL		0xe640
 
-#define CRU_CLKSEL_CON0		0x0100
-#define CRU_CLKSEL_CON6		0x0118
-#define CRU_SDIO0_CON1		0x058c
 #define PMUCRU_CLKSEL_CON0	0x0080
 #define PMUCRU_CLKGATE_CON2	0x0108
 #define PMUCRU_SOFTRST_CON0	0x0110
 #define PMUCRU_GATEDIS_CON0 0x0130
 #define PMUCRU_SOFTRST_CON(n)   (PMUCRU_SOFTRST_CON0 + (n) * 4)
+
+/*
+ * When system reset in running state, we want the cpus to be reboot
+ * from maskrom (system reboot),
+ * the pmusgrf reset-hold bits needs to be released.
+ * When system wake up from system deep suspend, some soc will be reset
+ * when waked up,
+ * we want the bootcpu to be reboot from pmusram,
+ * the pmusgrf reset-hold bits needs to be held.
+ */
+static inline void pmu_sgrf_rst_hld_release(void)
+{
+	mmio_write_32(PMUCRU_BASE + CRU_PMU_RSTHOLD_CON(1),
+		      CRU_PMU_SGRF_RST_RLS);
+}
+
+static inline void pmu_sgrf_rst_hld(void)
+{
+	mmio_write_32(PMUCRU_BASE + CRU_PMU_RSTHOLD_CON(1),
+		      CRU_PMU_SGRF_RST_HOLD);
+}
 
 /* export related and operating SoC APIs */
 void __dead2 soc_global_soft_reset(void);
@@ -274,11 +231,9 @@ void enable_dvfs_plls(void);
 void enable_nodvfs_plls(void);
 void prepare_abpll_for_ddrctrl(void);
 void restore_abpll(void);
+void restore_dpll(void);
 void clk_gate_con_save(void);
 void clk_gate_con_disable(void);
 void clk_gate_con_restore(void);
-void set_pmu_rsthold(void);
-void pmu_sgrf_rst_hld(void);
-__pmusramfunc void pmu_sgrf_rst_hld_release(void);
-__pmusramfunc void restore_pmu_rsthold(void);
-#endif /* SOC_H */
+
+#endif /* __SOC_H__ */

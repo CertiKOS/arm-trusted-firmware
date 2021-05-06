@@ -1,23 +1,21 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef GPIO_H
-#define GPIO_H
+#ifndef __GPIO_H__
+#define __GPIO_H__
 
-#include <export/drivers/gpio_exp.h>
+#define GPIO_DIR_OUT		0
+#define GPIO_DIR_IN		1
 
-#define GPIO_DIR_OUT		ARM_TF_GPIO_DIR_OUT
-#define GPIO_DIR_IN		ARM_TF_GPIO_DIR_IN
+#define GPIO_LEVEL_LOW		0
+#define GPIO_LEVEL_HIGH		1
 
-#define GPIO_LEVEL_LOW		ARM_TF_GPIO_LEVEL_LOW
-#define GPIO_LEVEL_HIGH		ARM_TF_GPIO_LEVEL_HIGH
-
-#define GPIO_PULL_NONE		ARM_TF_GPIO_PULL_NONE
-#define GPIO_PULL_UP		ARM_TF_GPIO_PULL_UP
-#define GPIO_PULL_DOWN		ARM_TF_GPIO_PULL_DOWN
+#define GPIO_PULL_NONE		0
+#define GPIO_PULL_UP		1
+#define GPIO_PULL_DOWN		2
 
 typedef struct gpio_ops {
 	int (*get_direction)(int gpio);
@@ -36,4 +34,4 @@ void gpio_set_pull(int gpio, int pull);
 int gpio_get_pull(int gpio);
 void gpio_init(const gpio_ops_t *ops);
 
-#endif /* GPIO_H */
+#endif	/* __GPIO_H__ */

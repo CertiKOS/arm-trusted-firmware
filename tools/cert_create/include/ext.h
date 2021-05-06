@@ -1,14 +1,14 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef EXT_H
-#define EXT_H
+#ifndef EXT_H_
+#define EXT_H_
 
-#include <openssl/x509v3.h>
 #include "key.h"
+#include <openssl/x509v3.h>
 
 /* Extension types supported */
 enum ext_type_e {
@@ -75,20 +75,11 @@ X509_EXTENSION *ext_new_key(int nid, int crit, EVP_PKEY *k);
 
 /* Macro to register the extensions used in the CoT */
 #define REGISTER_EXTENSIONS(_ext) \
-	ext_t *def_extensions = &_ext[0]; \
-	const unsigned int num_def_extensions = sizeof(_ext)/sizeof(_ext[0])
-
-/* Macro to register the platform defined extensions used in the CoT */
-#define PLAT_REGISTER_EXTENSIONS(_pdef_ext) \
-	ext_t *pdef_extensions = &_pdef_ext[0]; \
-	const unsigned int num_pdef_extensions = sizeof(_pdef_ext)/sizeof(_pdef_ext[0])
+	ext_t *extensions = &_ext[0]; \
+	const unsigned int num_extensions = sizeof(_ext)/sizeof(_ext[0])
 
 /* Exported variables */
-extern ext_t *def_extensions;
-extern const unsigned int num_def_extensions;
-extern ext_t *pdef_extensions;
-extern const unsigned int num_pdef_extensions;
-
 extern ext_t *extensions;
-extern unsigned int num_extensions;
-#endif /* EXT_H */
+extern const unsigned int num_extensions;
+
+#endif /* EXT_H_ */

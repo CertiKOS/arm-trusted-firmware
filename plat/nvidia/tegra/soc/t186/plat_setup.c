@@ -1,38 +1,27 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
-#include <bl31/bl31.h>
-#include <bl31/interrupt_mgmt.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/ep_info.h>
-#include <common/interrupt_props.h>
+#include <assert.h>
+#include <bl31.h>
+#include <bl_common.h>
+#include <console.h>
 #include <context.h>
+#include <context_mgmt.h>
 #include <cortex_a57.h>
+#include <debug.h>
 #include <denver.h>
-#include <drivers/arm/gic_common.h>
-#include <drivers/arm/gicv2.h>
-#include <drivers/console.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/utils.h>
-#include <lib/xlat_tables/xlat_tables_v2.h>
-#include <plat/common/platform.h>
-
+#include <ep_info.h>
+#include <interrupt_mgmt.h>
 #include <mce.h>
-#include <memctrl.h>
-#include <smmu.h>
+#include <platform.h>
 #include <tegra_def.h>
 #include <tegra_platform.h>
 #include <tegra_private.h>
-
-extern void memcpy16(void *dest, const void *src, unsigned int length);
+#include <xlat_tables_v2.h>
 
 /*******************************************************************************
  * Tegra186 CPU numbers in cluster #0
@@ -71,49 +60,49 @@ const uint8_t *plat_get_power_domain_tree_desc(void)
  */
 static const mmap_region_t tegra_mmap[] = {
 	MAP_REGION_FLAT(TEGRA_MISC_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_TSA_BASE, 0x20000U, /* 128KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_MC_STREAMID_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_MC_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_UARTA_BASE, 0x20000U, /* 128KB - UART A, B*/
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_UARTC_BASE, 0x20000U, /* 128KB - UART C, G */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_UARTD_BASE, 0x30000U, /* 192KB - UART D, E, F */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_FUSE_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_GICD_BASE, 0x20000U, /* 128KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_SE0_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_PKA1_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_RNG1_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_CAR_RESET_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_PMC_BASE, 0x40000U, /* 256KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_TMRUS_BASE, 0x1000U, /* 4KB */
-			MT_DEVICE | MT_RO | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RO | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_SCRATCH_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_MMCRAB_BASE, 0x60000U, /* 384KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_ARM_ACTMON_CTR_BASE, 0x20000U, /* 128KB - ARM/Denver */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_SMMU0_BASE, 0x1000000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_HSP_DBELL_BASE, 0x10000U, /* 64KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_BPMP_IPC_TX_PHYS_BASE, TEGRA_BPMP_IPC_CH_MAP_SIZE, /* 4KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	MAP_REGION_FLAT(TEGRA_BPMP_IPC_RX_PHYS_BASE, TEGRA_BPMP_IPC_CH_MAP_SIZE, /* 4KB */
-			MT_DEVICE | MT_RW | MT_SECURE),
+			(uint8_t)MT_DEVICE | (uint8_t)MT_RW | (uint8_t)MT_SECURE),
 	{0}
 };
 
@@ -154,30 +143,19 @@ static uint32_t tegra186_uart_addresses[TEGRA186_MAX_UART_PORTS + 1] = {
 };
 
 /*******************************************************************************
- * Enable console corresponding to the console ID
+ * Retrieve the UART controller base to be used as the console
  ******************************************************************************/
-void plat_enable_console(int32_t id)
+uint32_t plat_get_console_from_id(int32_t id)
 {
-	static console_t uart_console;
-	uint32_t console_clock;
+	uint32_t ret;
 
-	if ((id > 0) && (id < TEGRA186_MAX_UART_PORTS)) {
-		/*
-		 * Reference clock used by the FPGAs is a lot slower.
-		 */
-		if (tegra_platform_is_fpga()) {
-			console_clock = TEGRA_BOOT_UART_CLK_13_MHZ;
-		} else {
-			console_clock = TEGRA_BOOT_UART_CLK_408_MHZ;
-		}
-
-		(void)console_16550_register(tegra186_uart_addresses[id],
-					     console_clock,
-					     TEGRA_CONSOLE_BAUDRATE,
-					     &uart_console);
-		console_set_scope(&uart_console, CONSOLE_FLAG_BOOT |
-			CONSOLE_FLAG_RUNTIME | CONSOLE_FLAG_CRASH);
+	if (id > TEGRA186_MAX_UART_PORTS) {
+		ret = 0;
+	} else {
+		ret = tegra186_uart_addresses[id];
 	}
+
+	return ret;
 }
 
 /*******************************************************************************
@@ -187,19 +165,9 @@ void plat_early_platform_setup(void)
 {
 	uint64_t impl, val;
 	const plat_params_from_bl2_t *plat_params = bl31_get_plat_params();
-	const struct tegra_bl31_params *arg_from_bl2 = plat_get_bl31_params();
-
-	/* Verify chip id is t186 */
-	assert(tegra_chipid_is_t186());
 
 	/* sanity check MCE firmware compatibility */
 	mce_verify_firmware_version();
-
-	/*
-	 * Do initial security configuration to allow DRAM/device access.
-	 */
-	tegra_memctrl_tzdram_setup(plat_params->tzdram_base,
-			(uint32_t)plat_params->tzdram_size);
 
 	impl = (read_midr() >> MIDR_IMPL_SHIFT) & (uint64_t)MIDR_IMPL_MASK;
 
@@ -214,13 +182,6 @@ void plat_early_platform_setup(void)
 		val |= CORTEX_A57_L2_ECC_PARITY_PROTECTION_BIT;
 		write_l2ctlr_el1(val);
 	}
-
-	/*
-	 * The previous bootloader might not have placed the BL32 image
-	 * inside the TZDRAM. Platform handler to allow relocation of BL32
-	 * image to TZDRAM memory. This behavior might change per platform.
-	 */
-	plat_relocate_bl32_image(arg_from_bl2->bl32_image_info);
 }
 
 /*******************************************************************************
@@ -232,13 +193,17 @@ void plat_late_platform_setup(void)
 }
 
 /* Secure IRQs for Tegra186 */
-static const interrupt_prop_t tegra186_interrupt_props[] = {
-	INTR_PROP_DESC(TEGRA_SDEI_SGI_PRIVATE, PLAT_SDEI_CRITICAL_PRI,
-			GICV2_INTR_GROUP0, GIC_INTR_CFG_EDGE),
-	INTR_PROP_DESC(TEGRA186_TOP_WDT_IRQ, PLAT_TEGRA_WDT_PRIO,
-			GICV2_INTR_GROUP0, GIC_INTR_CFG_EDGE),
-	INTR_PROP_DESC(TEGRA186_AON_WDT_IRQ, PLAT_TEGRA_WDT_PRIO,
-			GICV2_INTR_GROUP0, GIC_INTR_CFG_EDGE)
+static const irq_sec_cfg_t tegra186_sec_irqs[] = {
+	{
+		TEGRA186_TOP_WDT_IRQ,
+		TEGRA186_SEC_IRQ_TARGET_MASK,
+		INTR_TYPE_EL3,
+	},
+	{
+		TEGRA186_AON_WDT_IRQ,
+		TEGRA186_SEC_IRQ_TARGET_MASK,
+		INTR_TYPE_EL3,
+	},
 };
 
 /*******************************************************************************
@@ -246,26 +211,31 @@ static const interrupt_prop_t tegra186_interrupt_props[] = {
  ******************************************************************************/
 void plat_gic_setup(void)
 {
-	tegra_gic_setup(tegra186_interrupt_props, ARRAY_SIZE(tegra186_interrupt_props));
-	tegra_gic_init();
+	tegra_gic_cfg_t tegra186_gic_cfg = {0};
+
+	tegra186_gic_cfg.irq_cfg = tegra186_sec_irqs;
+	tegra186_gic_cfg.g0_int_num = ARRAY_SIZE(tegra186_sec_irqs);
+	tegra_gic_setup(&tegra186_gic_cfg);
 
 	/*
 	 * Initialize the FIQ handler only if the platform supports any
 	 * FIQ interrupt sources.
 	 */
-	tegra_fiq_handler_setup();
+	if (sizeof(tegra186_sec_irqs) > 0U) {
+		tegra_fiq_handler_setup();
+	}
 }
 
 /*******************************************************************************
  * Return pointer to the BL31 params from previous bootloader
  ******************************************************************************/
-struct tegra_bl31_params *plat_get_bl31_params(void)
+bl31_params_t *plat_get_bl31_params(void)
 {
 	uint32_t val;
 
 	val = mmio_read_32(TEGRA_SCRATCH_BASE + SCRATCH_BL31_PARAMS_ADDR);
 
-	return (struct tegra_bl31_params *)(uintptr_t)val;
+	return (bl31_params_t *)(uintptr_t)val;
 }
 
 /*******************************************************************************
@@ -346,13 +316,11 @@ void plat_relocate_bl32_image(const image_info_t *bl32_img_info)
 
 			INFO("Relocate BL32 to TZDRAM\n");
 
-			(void)memcpy16((void *)(uintptr_t)bl32_ep_info->pc,
-				(void *)(uintptr_t)bl32_start,
-				bl32_img_info->image_size);
+			tegra_memcpy(bl32_ep_info->pc, bl32_start,
+				    (uint64_t)bl32_img_info->image_size);
 
 			/* clean up non-secure intermediate buffer */
-			zeromem((void *)(uintptr_t)bl32_start,
-				bl32_img_info->image_size);
+			tegra_zeromem(bl32_start, (uint64_t)bl32_img_info->image_size);
 		}
 	}
 }
@@ -363,35 +331,4 @@ void plat_relocate_bl32_image(const image_info_t *bl32_img_info)
 bool plat_supports_system_suspend(void)
 {
 	return true;
-}
-/*******************************************************************************
- * Platform specific runtime setup.
- ******************************************************************************/
-void plat_runtime_setup(void)
-{
-	/*
-	 * During cold boot, it is observed that the arbitration
-	 * bit is set in the Memory controller leading to false
-	 * error interrupts in the non-secure world. To avoid
-	 * this, clean the interrupt status register before
-	 * booting into the non-secure world
-	 */
-	tegra_memctrl_clear_pending_interrupts();
-
-	/*
-	 * During boot, USB3 and flash media (SDMMC/SATA) devices need
-	 * access to IRAM. Because these clients connect to the MC and
-	 * do not have a direct path to the IRAM, the MC implements AHB
-	 * redirection during boot to allow path to IRAM. In this mode
-	 * accesses to a programmed memory address aperture are directed
-	 * to the AHB bus, allowing access to the IRAM. This mode must be
-	 * disabled before we jump to the non-secure world.
-	 */
-	tegra_memctrl_disable_ahb_redirection();
-
-	/*
-	 * Verify the integrity of the previously configured SMMU(s)
-	 * settings
-	 */
-	tegra_smmu_verify();
 }

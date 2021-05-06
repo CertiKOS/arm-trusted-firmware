@@ -1,31 +1,13 @@
 /*
- * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <drivers/arm/css/css_mhu_doorbell.h>
-#include <drivers/arm/css/scmi.h>
-#include <plat/arm/common/plat_arm.h>
-#include <plat/arm/css/common/css_pm.h>
-#include <plat/common/platform.h>
-#include <platform_def.h>
+#include <arm_def.h>
+#include <plat_arm.h>
+#include "juno_def.h"
 
-#if CSS_USE_SCMI_SDS_DRIVER
-static scmi_channel_plat_info_t juno_scmi_plat_info = {
-		.scmi_mbx_mem = CSS_SCMI_PAYLOAD_BASE,
-		.db_reg_addr = PLAT_CSS_MHU_BASE + CSS_SCMI_MHU_DB_REG_OFF,
-		.db_preserve_mask = 0xfffffffe,
-		.db_modify_mask = 0x1,
-		.ring_doorbell = &mhu_ring_doorbell,
-};
-
-scmi_channel_plat_info_t *plat_css_get_scmi_info(int channel_id)
-{
-	return &juno_scmi_plat_info;
-}
-
-#endif
 /*
  * On Juno, the system power level is the highest power level.
  * The first entry in the power domain descriptor specifies the
@@ -41,7 +23,7 @@ scmi_channel_plat_info_t *plat_css_get_scmi_info(int channel_id)
  * i.e. CLUSTER1 CPUs are allocated indices from 0 to 3 and the higher
  * indices for CLUSTER0 CPUs.
  */
-static const unsigned char juno_power_domain_tree_desc[] = {
+const unsigned char juno_power_domain_tree_desc[] = {
 	/* No of root nodes */
 	JUNO_PWR_DOMAINS_AT_MAX_PWR_LVL,
 	/* No of children for the root node */
@@ -66,8 +48,8 @@ const unsigned char *plat_get_power_domain_tree_desc(void)
  ******************************************************************************/
 unsigned int plat_arm_get_cluster_core_count(u_register_t mpidr)
 {
-	return (((mpidr & (u_register_t) 0x100) != 0U) ?
-			JUNO_CLUSTER1_CORE_COUNT : JUNO_CLUSTER0_CORE_COUNT);
+	return (((mpidr) & 0x100) ? JUNO_CLUSTER1_CORE_COUNT :\
+				JUNO_CLUSTER0_CORE_COUNT);
 }
 
 /*

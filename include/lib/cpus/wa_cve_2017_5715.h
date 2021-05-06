@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef WA_CVE_2017_5715_H
-#define WA_CVE_2017_5715_H
+#ifndef __WA_CVE_2017_5715_H__
+#define __WA_CVE_2017_5715_H__
 
 int check_wa_cve_2017_5715(void);
 
-#endif /* WA_CVE_2017_5715_H */
+#endif /* __WA_CVE_2017_5715_H__ */

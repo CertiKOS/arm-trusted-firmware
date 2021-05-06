@@ -1,24 +1,21 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <stdint.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <drivers/io/io_block.h>
-#include <lib/mmio.h>
-#include <lib/utils_def.h>
+#include <assert.h>
+#include <io/io_block.h>
+#include <mmio.h>
+#include <platform_def.h>
+#include <sys/types.h>
+#include <utils_def.h>
 
 #include "uniphier.h"
 
 #define UNIPHIER_LD11_USB_DESC_BASE	0x30010000
 #define UNIPHIER_LD20_USB_DESC_BASE	0x30014000
-#define UNIPHIER_PXS3_USB_DESC_BASE	0x30014000
 
 #define UNIPHIER_SRB_OCM_CONT		0x61200000
 
@@ -39,13 +36,6 @@ struct uniphier_ld20_trans_op {
 
 struct uniphier_ld20_op {
 	uint8_t __pad[192];
-	struct uniphier_ld20_trans_op *trans_op;
-	void *__pad2;
-	void *dev_desc;
-};
-
-struct uniphier_pxs3_op {
-	uint8_t __pad[184];
 	struct uniphier_ld20_trans_op *trans_op;
 	void *__pad2;
 	void *dev_desc;
@@ -101,27 +91,14 @@ static int uniphier_ld20_usb_read(int lba, uintptr_t buf, size_t size)
 	return ret ? 0 : -1;
 }
 
-static void uniphier_pxs3_usb_init(void)
-{
-	struct uniphier_pxs3_op *op = (void *)UNIPHIER_PXS3_USB_DESC_BASE;
-
-	op->trans_op = (void *)(op + 1);
-
-	op->dev_desc = op->trans_op + 1;
-}
-
 static int uniphier_pxs3_usb_read(int lba, uintptr_t buf, size_t size)
 {
-	static int (*rom_usb_read)(uintptr_t desc, unsigned int lba,
-				   unsigned int size, uintptr_t buf);
-	int ret;
+	static int (*rom_usb_read)(unsigned int lba, unsigned int size,
+				   uintptr_t buf);
 
-	rom_usb_read = (__typeof(rom_usb_read))0x39e8;
+	rom_usb_read = (__typeof(rom_usb_read))0x100c;
 
-	/* ROM-API - return 1 on success, 0 on error */
-	ret = rom_usb_read(UNIPHIER_PXS3_USB_DESC_BASE, lba, size, buf);
-
-	return ret ? 0 : -1;
+	return rom_usb_read(lba, size, buf);
 }
 
 struct uniphier_usb_rom_param {
@@ -139,7 +116,6 @@ static const struct uniphier_usb_rom_param uniphier_usb_rom_params[] = {
 		.read = uniphier_ld20_usb_read,
 	},
 	[UNIPHIER_SOC_PXS3] = {
-		.init = uniphier_pxs3_usb_init,
 		.read = uniphier_pxs3_usb_read,
 	},
 };
@@ -158,14 +134,17 @@ static size_t uniphier_usb_read(int lba, uintptr_t buf, size_t size)
 }
 
 static struct io_block_dev_spec uniphier_usb_dev_spec = {
+	.buffer = {
+		.offset = UNIPHIER_BLOCK_BUF_BASE,
+		.length = UNIPHIER_BLOCK_BUF_SIZE,
+	},
 	.ops = {
 		.read = uniphier_usb_read,
 	},
 	.block_size = 512,
 };
 
-int uniphier_usb_init(unsigned int soc,
-		      struct io_block_dev_spec **block_dev_spec)
+int uniphier_usb_init(unsigned int soc, uintptr_t *block_dev_spec)
 {
 	const struct uniphier_usb_rom_param *param;
 
@@ -177,7 +156,7 @@ int uniphier_usb_init(unsigned int soc,
 
 	__uniphier_usb_read = param->read;
 
-	*block_dev_spec = &uniphier_usb_dev_spec;
+	*block_dev_spec = (uintptr_t)&uniphier_usb_dev_spec;
 
 	return 0;
 }

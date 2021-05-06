@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef DRAM_H
-#define DRAM_H
-
-#include <stdint.h>
+#ifndef __SOC_ROCKCHIP_RK3399_DRAM_H__
+#define __SOC_ROCKCHIP_RK3399_DRAM_H__
 
 #include <dram_regs.h>
 #include <plat_private.h>
+#include <stdint.h>
 
 enum {
 	DDR3 = 3,
@@ -26,10 +25,10 @@ struct rk3399_ddr_pctl_regs {
 
 struct rk3399_ddr_publ_regs {
 	/*
-	 * PHY registers from 0 to 90 for slice1.
-	 * These are used to restore slice1-4 on resume.
+	 * PHY registers from 0 to 511.
+	 * Only registers 0-90 of each 128 register range are used.
 	 */
-	uint32_t phy0[91];
+	uint32_t phy0[4][91];
 	/*
 	 * PHY registers from 512 to 895.
 	 * Only registers 0-37 of each 128 register range are used.
@@ -153,4 +152,4 @@ extern __sramdata struct rk3399_sdram_params sdram_config;
 
 void dram_init(void);
 
-#endif /* DRAM_H */
+#endif

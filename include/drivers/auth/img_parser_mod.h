@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef IMG_PARSER_MOD_H
-#define IMG_PARSER_MOD_H
+#ifndef __IMG_PARSER_MOD_H__
+#define __IMG_PARSER_MOD_H__
 
-#include <drivers/auth/auth_common.h>
+#include <auth_common.h>
 
 /*
  * Return values
@@ -44,10 +44,10 @@ typedef struct img_parser_lib_desc_s {
 /* Exported functions */
 void img_parser_init(void);
 int img_parser_check_integrity(img_type_t img_type,
-		void *img_ptr, unsigned int img_len);
+		void *img, unsigned int img_len);
 int img_parser_get_auth_param(img_type_t img_type,
 		const auth_param_type_desc_t *type_desc,
-		void *img_ptr, unsigned int img_len,
+		void *img, unsigned int img_len,
 		void **param_ptr, unsigned int *param_len);
 
 /* Macro to register an image parser library */
@@ -61,4 +61,4 @@ int img_parser_get_auth_param(img_type_t img_type,
 		.get_auth_param = _get_param \
 	}
 
-#endif /* IMG_PARSER_MOD_H */
+#endif /* __IMG_PARSER_MOD_H__ */

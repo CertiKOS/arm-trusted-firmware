@@ -1,29 +1,23 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <bl_common.h>
+#include <debug.h>
 #include <errno.h>
+#include <firmware_image_package.h>
+#include <io_driver.h>
+#include <io_fip.h>
+#include <io_storage.h>
+#include <platform.h>
+#include <platform_def.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <platform_def.h>
-
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/io/io_driver.h>
-#include <drivers/io/io_fip.h>
-#include <drivers/io/io_storage.h>
-#include <lib/utils.h>
-#include <plat/common/platform.h>
-#include <tools_share/firmware_image_package.h>
-#include <tools_share/uuid.h>
-
-#ifndef MAX_FIP_DEVICES
-#define MAX_FIP_DEVICES		1
-#endif
+#include <utils.h>
+#include <uuid.h>
 
 /* Useful for printing UUIDs when debugging.*/
 #define PRINT_UUID2(x)								\
@@ -34,37 +28,19 @@
 		x.node[4], x.node[5]
 
 typedef struct {
+	/* Put file_pos above the struct to allow {0} on static init.
+	 * It is a workaround for a known bug in GCC
+	 * http://gcc.gnu.org/bugzilla/show_bug.cgi?id=53119
+	 */
 	unsigned int file_pos;
 	fip_toc_entry_t entry;
-} fip_file_state_t;
+} file_state_t;
 
-/*
- * Maintain dev_spec per FIP Device
- * TODO - Add backend handles and file state
- * per FIP device here once backends like io_memmap
- * can support multiple open files
- */
-typedef struct {
-	uintptr_t dev_spec;
-	uint16_t plat_toc_flag;
-} fip_dev_state_t;
-
-/*
- * Only one file can be open across all FIP device
- * as backends like io_memmap don't support
- * multiple open files. The file state and
- * backend handle should be maintained per FIP device
- * if the same support is available in the backend
- */
-static fip_file_state_t current_fip_file = {0};
+static const uuid_t uuid_null = {0};
+static file_state_t current_file = {0};
 static uintptr_t backend_dev_handle;
 static uintptr_t backend_image_spec;
 
-static fip_dev_state_t state_pool[MAX_FIP_DEVICES];
-static io_dev_info_t dev_info_pool[MAX_FIP_DEVICES];
-
-/* Track number of allocated fip devices */
-static unsigned int fip_dev_count;
 
 /* Firmware Image Package driver functions */
 static int fip_dev_open(const uintptr_t dev_spec, io_dev_info_t **dev_info);
@@ -85,6 +61,7 @@ static inline int compare_uuids(const uuid_t *uuid1, const uuid_t *uuid2)
 }
 
 
+/* TODO: We could check version numbers or do a package checksum? */
 static inline int is_valid_header(fip_toc_header_t *header)
 {
 	if ((header->name == TOC_HEADER_NAME) && (header->serial_number != 0)) {
@@ -96,7 +73,7 @@ static inline int is_valid_header(fip_toc_header_t *header)
 
 
 /* Identify the device type as a virtual driver */
-static io_type_t device_type_fip(void)
+io_type_t device_type_fip(void)
 {
 	return IO_TYPE_FIRMWARE_IMAGE_PACKAGE;
 }
@@ -119,94 +96,20 @@ static const io_dev_funcs_t fip_dev_funcs = {
 	.dev_close = fip_dev_close,
 };
 
-/* Locate a file state in the pool, specified by address */
-static int find_first_fip_state(const uintptr_t dev_spec,
-				  unsigned int *index_out)
-{
-	int result = -ENOENT;
-	unsigned int index;
 
-	for (index = 0; index < (unsigned int)MAX_FIP_DEVICES; ++index) {
-		/* dev_spec is used as identifier since it's unique */
-		if (state_pool[index].dev_spec == dev_spec) {
-			result = 0;
-			*index_out = index;
-			break;
-		}
-	}
-	return result;
-}
+/* No state associated with this device so structure can be const */
+static const io_dev_info_t fip_dev_info = {
+	.funcs = &fip_dev_funcs,
+	.info = (uintptr_t)NULL
+};
 
 
-/* Allocate a device info from the pool and return a pointer to it */
-static int allocate_dev_info(io_dev_info_t **dev_info)
-{
-	int result = -ENOMEM;
-
-	assert(dev_info != NULL);
-
-	if (fip_dev_count < (unsigned int)MAX_FIP_DEVICES) {
-		unsigned int index = 0;
-
-		result = find_first_fip_state(0, &index);
-		assert(result == 0);
-		/* initialize dev_info */
-		dev_info_pool[index].funcs = &fip_dev_funcs;
-		dev_info_pool[index].info =
-				(uintptr_t)&state_pool[index];
-		*dev_info = &dev_info_pool[index];
-		++fip_dev_count;
-	}
-
-	return result;
-}
-
-/* Release a device info to the pool */
-static int free_dev_info(io_dev_info_t *dev_info)
-{
-	int result;
-	unsigned int index = 0;
-	fip_dev_state_t *state;
-
-	assert(dev_info != NULL);
-
-	state = (fip_dev_state_t *)dev_info->info;
-	result = find_first_fip_state(state->dev_spec, &index);
-	if (result ==  0) {
-		/* free if device info is valid */
-		zeromem(state, sizeof(fip_dev_state_t));
-		--fip_dev_count;
-	}
-
-	return result;
-}
-
-/*
- * Multiple FIP devices can be opened depending on the value of
- * MAX_FIP_DEVICES. Given that there is only one backend, only a
- * single file can be open at a time by any FIP device.
- */
-static int fip_dev_open(const uintptr_t dev_spec,
+/* Open a connection to the FIP device */
+static int fip_dev_open(const uintptr_t dev_spec __unused,
 			 io_dev_info_t **dev_info)
 {
-	int result;
-	io_dev_info_t *info;
-	fip_dev_state_t *state;
-
 	assert(dev_info != NULL);
-#if MAX_FIP_DEVICES > 1
-	assert(dev_spec != (uintptr_t)NULL);
-#endif
-
-	result = allocate_dev_info(&info);
-	if (result != 0)
-		return -ENOMEM;
-
-	state = (fip_dev_state_t *)info->info;
-
-	state->dev_spec = dev_spec;
-
-	*dev_info = info;
+	*dev_info = (io_dev_info_t *)&fip_dev_info; /* cast away const */
 
 	return 0;
 }
@@ -220,11 +123,6 @@ static int fip_dev_init(io_dev_info_t *dev_info, const uintptr_t init_params)
 	uintptr_t backend_handle;
 	fip_toc_header_t header;
 	size_t bytes_read;
-	fip_dev_state_t *state;
-
-	assert(dev_info != NULL);
-
-	state = (fip_dev_state_t *)dev_info->info;
 
 	/* Obtain a reference to the image by querying the platform layer */
 	result = plat_get_image_source(image_id, &backend_dev_handle,
@@ -253,11 +151,6 @@ static int fip_dev_init(io_dev_info_t *dev_info, const uintptr_t init_params)
 			result = -ENOENT;
 		} else {
 			VERBOSE("FIP header looks OK.\n");
-			/*
-			 * Store 16-bit Platform ToC flags field which occupies
-			 * bits [32-47] in fip header.
-			 */
-			state->plat_toc_flag = (header.flags >> 32) & 0xffff;
 		}
 	}
 
@@ -276,7 +169,7 @@ static int fip_dev_close(io_dev_info_t *dev_info)
 	backend_dev_handle = (uintptr_t)NULL;
 	backend_image_spec = (uintptr_t)NULL;
 
-	return free_dev_info(dev_info);
+	return 0;
 }
 
 
@@ -287,7 +180,6 @@ static int fip_file_open(io_dev_info_t *dev_info, const uintptr_t spec,
 	int result;
 	uintptr_t backend_handle;
 	const io_uuid_spec_t *uuid_spec = (io_uuid_spec_t *)spec;
-	static const uuid_t uuid_null = { {0} }; /* Double braces for clang */
 	size_t bytes_read;
 	int found_file = 0;
 
@@ -300,9 +192,9 @@ static int fip_file_open(io_dev_info_t *dev_info, const uintptr_t spec,
 	 * When the system supports dynamic memory allocation we can allow more
 	 * than one open file at a time if needed.
 	 */
-	if (current_fip_file.entry.offset_address != 0U) {
+	if (current_file.entry.offset_address != 0) {
 		WARN("fip_file_open : Only one open file at a time.\n");
-		return -ENFILE;
+		return -ENOMEM;
 	}
 
 	/* Attempt to access the FIP image */
@@ -315,8 +207,7 @@ static int fip_file_open(io_dev_info_t *dev_info, const uintptr_t spec,
 	}
 
 	/* Seek past the FIP header into the Table of Contents */
-	result = io_seek(backend_handle, IO_SEEK_SET,
-			 (signed long long)sizeof(fip_toc_header_t));
+	result = io_seek(backend_handle, IO_SEEK_SET, sizeof(fip_toc_header_t));
 	if (result != 0) {
 		WARN("fip_file_open: failed to seek\n");
 		result = -ENOENT;
@@ -326,32 +217,31 @@ static int fip_file_open(io_dev_info_t *dev_info, const uintptr_t spec,
 	found_file = 0;
 	do {
 		result = io_read(backend_handle,
-				 (uintptr_t)&current_fip_file.entry,
-				 sizeof(current_fip_file.entry),
+				 (uintptr_t)&current_file.entry,
+				 sizeof(current_file.entry),
 				 &bytes_read);
 		if (result == 0) {
-			if (compare_uuids(&current_fip_file.entry.uuid,
+			if (compare_uuids(&current_file.entry.uuid,
 					  &uuid_spec->uuid) == 0) {
 				found_file = 1;
+				break;
 			}
 		} else {
 			WARN("Failed to read FIP (%i)\n", result);
 			goto fip_file_open_close;
 		}
-	} while ((found_file == 0) &&
-			(compare_uuids(&current_fip_file.entry.uuid,
-				&uuid_null) != 0));
+	} while (compare_uuids(&current_file.entry.uuid, &uuid_null) != 0);
 
 	if (found_file == 1) {
 		/* All fine. Update entity info with file state and return. Set
-		 * the file position to 0. The 'current_fip_file.entry' holds
-		 * the base and size of the file.
+		 * the file position to 0. The 'current_file.entry' holds the
+		 * base and size of the file.
 		 */
-		current_fip_file.file_pos = 0;
-		entity->info = (uintptr_t)&current_fip_file;
+		current_file.file_pos = 0;
+		entity->info = (uintptr_t)&current_file;
 	} else {
 		/* Did not find the file in the FIP. */
-		current_fip_file.entry.offset_address = 0;
+		current_file.entry.offset_address = 0;
 		result = -ENOENT;
 	}
 
@@ -369,7 +259,7 @@ static int fip_file_len(io_entity_t *entity, size_t *length)
 	assert(entity != NULL);
 	assert(length != NULL);
 
-	*length =  ((fip_file_state_t *)entity->info)->entry.size;
+	*length =  ((file_state_t *)entity->info)->entry.size;
 
 	return 0;
 }
@@ -380,12 +270,13 @@ static int fip_file_read(io_entity_t *entity, uintptr_t buffer, size_t length,
 			  size_t *length_read)
 {
 	int result;
-	fip_file_state_t *fp;
+	file_state_t *fp;
 	size_t file_offset;
 	size_t bytes_read;
 	uintptr_t backend_handle;
 
 	assert(entity != NULL);
+	assert(buffer != (uintptr_t)NULL);
 	assert(length_read != NULL);
 	assert(entity->info != (uintptr_t)NULL);
 
@@ -398,12 +289,11 @@ static int fip_file_read(io_entity_t *entity, uintptr_t buffer, size_t length,
 		goto fip_file_read_exit;
 	}
 
-	fp = (fip_file_state_t *)entity->info;
+	fp = (file_state_t *)entity->info;
 
 	/* Seek to the position in the FIP where the payload lives */
 	file_offset = fp->entry.offset_address + fp->file_pos;
-	result = io_seek(backend_handle, IO_SEEK_SET,
-			 (signed long long)file_offset);
+	result = io_seek(backend_handle, IO_SEEK_SET, file_offset);
 	if (result != 0) {
 		WARN("fip_file_read: failed to seek\n");
 		result = -ENOENT;
@@ -437,8 +327,8 @@ static int fip_file_close(io_entity_t *entity)
 	/* Clear our current file pointer.
 	 * If we had malloc() we would free() here.
 	 */
-	if (current_fip_file.entry.offset_address != 0U) {
-		zeromem(&current_fip_file, sizeof(current_fip_file));
+	if (current_file.entry.offset_address != 0) {
+		zeromem(&current_file, sizeof(current_file));
 	}
 
 	/* Clear the Entity info. */
@@ -455,27 +345,9 @@ int register_io_dev_fip(const io_dev_connector_t **dev_con)
 	int result;
 	assert(dev_con != NULL);
 
-	/*
-	 * Since dev_info isn't really used in io_register_device, always
-	 * use the same device info at here instead.
-	 */
-	result = io_register_device(&dev_info_pool[0]);
+	result = io_register_device(&fip_dev_info);
 	if (result == 0)
 		*dev_con = &fip_dev_connector;
 
 	return result;
-}
-
-/* Function to retrieve plat_toc_flags, previously saved in FIP dev */
-int fip_dev_get_plat_toc_flag(io_dev_info_t *dev_info, uint16_t *plat_toc_flag)
-{
-	fip_dev_state_t *state;
-
-	assert(dev_info != NULL);
-
-	state = (fip_dev_state_t *)dev_info->info;
-
-	*plat_toc_flag =  state->plat_toc_flag;
-
-	return 0;
 }

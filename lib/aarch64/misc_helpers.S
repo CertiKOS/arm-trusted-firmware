@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2021, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,27 +7,61 @@
 #include <arch.h>
 #include <asm_macros.S>
 #include <assert_macros.S>
-#include <common/bl_common.h>
-#include <lib/xlat_tables/xlat_tables_defs.h>
 
+	.globl	get_afflvl_shift
+	.globl	mpidr_mask_lower_afflvls
+	.globl	eret
 	.globl	smc
 
 	.globl	zero_normalmem
 	.globl	zeromem
+	.globl	zeromem16
 	.globl	memcpy16
 
-	.globl	disable_mmu_el1
 	.globl	disable_mmu_el3
-	.globl	disable_mmu_icache_el1
 	.globl	disable_mmu_icache_el3
-	.globl	fixup_gdt_reloc
+
 #if SUPPORT_VFP
 	.globl	enable_vfp
 #endif
 
+func get_afflvl_shift
+	cmp	x0, #3
+	cinc	x0, x0, eq
+	mov	x1, #MPIDR_AFFLVL_SHIFT
+	lsl	x0, x0, x1
+	ret
+endfunc get_afflvl_shift
+
+func mpidr_mask_lower_afflvls
+	cmp	x1, #3
+	cinc	x1, x1, eq
+	mov	x2, #MPIDR_AFFLVL_SHIFT
+	lsl	x2, x1, x2
+	lsr	x0, x0, x2
+	lsl	x0, x0, x2
+	ret
+endfunc mpidr_mask_lower_afflvls
+
+
+func eret
+	eret
+endfunc eret
+
+
 func smc
 	smc	#0
 endfunc smc
+
+/* -----------------------------------------------------------------------
+ * void zeromem16(void *mem, unsigned int length);
+ *
+ * Initialise a memory region to 0.
+ * The memory address must be 16-byte aligned.
+ * NOTE: This function is deprecated and zeromem should be used instead.
+ * -----------------------------------------------------------------------
+ */
+.equ	zeromem16, zeromem
 
 /* -----------------------------------------------------------------------
  * void zero_normalmem(void *mem, unsigned int length);
@@ -162,7 +196,7 @@ func zeromem_dczva
 	 * Check for M bit (MMU enabled) of the current SCTLR_EL(1|3)
 	 * register value and panic if the MMU is disabled.
 	 */
-#if defined(IMAGE_BL1) || defined(IMAGE_BL31) || (defined(IMAGE_BL2) && BL2_AT_EL3)
+#if defined(IMAGE_BL1) || defined(IMAGE_BL31)
 	mrs	tmp1, sctlr_el3
 #else
 	mrs	tmp1, sctlr_el1
@@ -417,11 +451,11 @@ endfunc memcpy16
 
 func disable_mmu_el3
 	mov	x1, #(SCTLR_M_BIT | SCTLR_C_BIT)
-do_disable_mmu_el3:
+do_disable_mmu:
 	mrs	x0, sctlr_el3
 	bic	x0, x0, x1
 	msr	sctlr_el3, x0
-	isb	/* ensure MMU is off */
+	isb				// ensure MMU is off
 	dsb	sy
 	ret
 endfunc disable_mmu_el3
@@ -429,30 +463,8 @@ endfunc disable_mmu_el3
 
 func disable_mmu_icache_el3
 	mov	x1, #(SCTLR_M_BIT | SCTLR_C_BIT | SCTLR_I_BIT)
-	b	do_disable_mmu_el3
+	b	do_disable_mmu
 endfunc disable_mmu_icache_el3
-
-/* ---------------------------------------------------------------------------
- * Disable the MMU at EL1
- * ---------------------------------------------------------------------------
- */
-
-func disable_mmu_el1
-	mov	x1, #(SCTLR_M_BIT | SCTLR_C_BIT)
-do_disable_mmu_el1:
-	mrs	x0, sctlr_el1
-	bic	x0, x0, x1
-	msr	sctlr_el1, x0
-	isb	/* ensure MMU is off */
-	dsb	sy
-	ret
-endfunc disable_mmu_el1
-
-
-func disable_mmu_icache_el1
-	mov	x1, #(SCTLR_M_BIT | SCTLR_C_BIT | SCTLR_I_BIT)
-	b	do_disable_mmu_el1
-endfunc disable_mmu_icache_el1
 
 /* ---------------------------------------------------------------------------
  * Enable the use of VFP at EL3
@@ -471,124 +483,3 @@ func enable_vfp
 	ret
 endfunc enable_vfp
 #endif
-
-/* ---------------------------------------------------------------------------
- * Helper to fixup Global Descriptor table (GDT) and dynamic relocations
- * (.rela.dyn) at runtime.
- *
- * This function is meant to be used when the firmware is compiled with -fpie
- * and linked with -pie options. We rely on the linker script exporting
- * appropriate markers for start and end of the section. For GOT, we
- * expect __GOT_START__ and __GOT_END__. Similarly for .rela.dyn, we expect
- * __RELA_START__ and __RELA_END__.
- *
- * The function takes the limits of the memory to apply fixups to as
- * arguments (which is usually the limits of the relocable BL image).
- *   x0 -  the start of the fixup region
- *   x1 -  the limit of the fixup region
- * These addresses have to be 4KB page aligned.
- * ---------------------------------------------------------------------------
- */
-
-/* Relocation codes */
-#define	R_AARCH64_NONE		0
-#define	R_AARCH64_RELATIVE	1027
-
-func fixup_gdt_reloc
-	mov	x6, x0
-	mov	x7, x1
-
-#if ENABLE_ASSERTIONS
-	/* Test if the limits are 4KB aligned */
-	orr	x0, x0, x1
-	tst	x0, #(PAGE_SIZE_MASK)
-	ASM_ASSERT(eq)
-#endif
-	/*
-	 * Calculate the offset based on return address in x30.
-	 * Assume that this function is called within a page at the start of
-	 * fixup region.
-	 */
-	and	x2, x30, #~(PAGE_SIZE_MASK)
-	subs	x0, x2, x6	/* Diff(S) = Current Address - Compiled Address */
-	b.eq	3f		/* Diff(S) = 0. No relocation needed */
-
-	adrp	x1, __GOT_START__
-	add	x1, x1, :lo12:__GOT_START__
-	adrp	x2, __GOT_END__
-	add	x2, x2, :lo12:__GOT_END__
-
-	/*
-	 * GOT is an array of 64_bit addresses which must be fixed up as
-	 * new_addr = old_addr + Diff(S).
-	 * The new_addr is the address currently the binary is executing from
-	 * and old_addr is the address at compile time.
-	 */
-1:	ldr	x3, [x1]
-
-	/* Skip adding offset if address is < lower limit */
-	cmp	x3, x6
-	b.lo	2f
-
-	/* Skip adding offset if address is >= upper limit */
-	cmp	x3, x7
-	b.hs	2f
-	add	x3, x3, x0
-	str	x3, [x1]
-
-2:	add	x1, x1, #8
-	cmp	x1, x2
-	b.lo	1b
-
-	/* Starting dynamic relocations. Use adrp/adr to get RELA_START and END */
-3:	adrp	x1, __RELA_START__
-	add	x1, x1, :lo12:__RELA_START__
-	adrp	x2, __RELA_END__
-	add	x2, x2, :lo12:__RELA_END__
-
-	/*
-	 * According to ELF-64 specification, the RELA data structure is as
-	 * follows:
-	 *	typedef struct {
-	 *		Elf64_Addr r_offset;
-	 *		Elf64_Xword r_info;
-	 *		Elf64_Sxword r_addend;
-	 *	} Elf64_Rela;
-	 *
-	 * r_offset is address of reference
-	 * r_info is symbol index and type of relocation (in this case
-	 * code 1027 which corresponds to R_AARCH64_RELATIVE).
-	 * r_addend is constant part of expression.
-	 *
-	 * Size of Elf64_Rela structure is 24 bytes.
-	 */
-
-	/* Skip R_AARCH64_NONE entry with code 0 */
-1:	ldr	x3, [x1, #8]
-	cbz	x3, 2f
-
-#if ENABLE_ASSERTIONS
-	/* Assert that the relocation type is R_AARCH64_RELATIVE */
-	cmp	x3, #R_AARCH64_RELATIVE
-	ASM_ASSERT(eq)
-#endif
-	ldr	x3, [x1]	/* r_offset */
-	add	x3, x0, x3
-	ldr	x4, [x1, #16]	/* r_addend */
-
-	/* Skip adding offset if r_addend is < lower limit */
-	cmp	x4, x6
-	b.lo	2f
-
-	/* Skip adding offset if r_addend entry is >= upper limit */
-	cmp	x4, x7
-	b.hs	2f
-
-	add	x4, x0, x4	/* Diff(S) + r_addend */
-	str	x4, [x3]
-
-2:	add	x1, x1, #24
-	cmp	x1, x2
-	b.lo	1b
-	ret
-endfunc fixup_gdt_reloc

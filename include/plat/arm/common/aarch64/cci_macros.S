@@ -3,10 +3,10 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef CCI_MACROS_S
-#define CCI_MACROS_S
+#ifndef __CCI_MACROS_S__
+#define __CCI_MACROS_S__
 
-#include <drivers/arm/cci.h>
+#include <cci.h>
 #include <platform_def.h>
 
 .section .rodata.cci_reg_name, "aS"
@@ -34,4 +34,4 @@ cci_iface_regs:
 	bl	str_in_crash_buf_print
 	.endm
 
-#endif /* CCI_MACROS_S */
+#endif /* __CCI_MACROS_S__ */

@@ -23,10 +23,10 @@ PLAT_INCLUDES		:=	-I${MTK_PLAT}/common/				\
 				-I${MTK_PLAT_SOC}/drivers/timer/			\
 				-I${MTK_PLAT_SOC}/include/					\
 				-Iinclude/plat/arm/common/					\
+				-Iinclude/common/tbbr/					\
 				${OEMS_INCLUDES}
 
-PLAT_BL_COMMON_SOURCES	:=	lib/xlat_tables/aarch64/xlat_tables.c			\
-				lib/xlat_tables/xlat_tables_common.c			\
+PLAT_BL_COMMON_SOURCES	:=	lib/aarch64/xlat_tables.c			\
 				plat/common/plat_gic.c
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
@@ -35,7 +35,7 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				drivers/arm/gic/v2/gicv2_main.c			\
 				drivers/arm/gic/v2/gicv2_helpers.c		\
 				plat/common/plat_gicv2.c			\
-				drivers/console/aarch64/console.S		\
+				drivers/console/console.S			\
 				drivers/delay_timer/delay_timer.c		\
 				lib/cpus/aarch64/cortex_a53.S			\
 				${MTK_PLAT_SOC}/bl31_plat_setup.c		\
@@ -52,16 +52,17 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				${MTK_PLAT_SOC}/scu.c		\
 				${OEMS_SOURCES}
 
+# Flag used by the MTK_platform port to determine the version of ARM GIC
+# architecture to use for interrupt management in EL3.
+ARM_GIC_ARCH		:=	2
+$(eval $(call add_define,ARM_GIC_ARCH))
+
 # Enable workarounds for selected Cortex-A53 erratas.
 ERRATA_A53_826319	:=	1
 ERRATA_A53_836870	:=	1
-
-WORKAROUND_CVE_2017_5715	:=	0
 
 # indicate the reset vector address can be programmed
 PROGRAMMABLE_RESET_ADDRESS	:=	1
 
 $(eval $(call add_define,MTK_SIP_KERNEL_BOOT_ENABLE))
 
-# Do not enable SVE
-ENABLE_SVE_FOR_NS	:=	0

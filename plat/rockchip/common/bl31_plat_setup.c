@@ -1,22 +1,35 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <arm_gic.h>
 #include <assert.h>
-
+#include <bl_common.h>
+#include <console.h>
+#include <debug.h>
+#include <generic_delay_timer.h>
+#include <mmio.h>
+#include <platform.h>
+#include <plat_private.h>
 #include <platform_def.h>
 
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/desc_image_load.h>
-#include <drivers/console.h>
-#include <drivers/generic_delay_timer.h>
-#include <drivers/ti/uart/uart_16550.h>
-#include <lib/mmio.h>
-#include <plat_private.h>
-#include <plat/common/platform.h>
+/*******************************************************************************
+ * Declarations of linker defined symbols which will help us find the layout
+ * of trusted SRAM
+ ******************************************************************************/
+unsigned long __RO_START__;
+unsigned long __RO_END__;
+
+/*
+ * The next 2 constants identify the extents of the code & RO data region.
+ * These addresses are used by the MMU setup code and therefore they must be
+ * page-aligned.  It is the responsibility of the linker script to ensure that
+ * __RO_START__ and __RO_END__ linker symbols refer to page-aligned addresses.
+ */
+#define BL31_RO_BASE (unsigned long)(&__RO_START__)
+#define BL31_RO_LIMIT (unsigned long)(&__RO_END__)
 
 static entry_point_info_t bl32_ep_info;
 static entry_point_info_t bl33_ep_info;
@@ -32,7 +45,6 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 	entry_point_info_t *next_image_info;
 
 	next_image_info = (type == NON_SECURE) ? &bl33_ep_info : &bl32_ep_info;
-	assert(next_image_info->h.type == PARAM_EP);
 
 	/* None of the images on this platform can have 0x0 as the entrypoint */
 	if (next_image_info->pc)
@@ -42,33 +54,37 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 }
 
 #pragma weak params_early_setup
-void params_early_setup(u_register_t plat_param_from_bl2)
+void params_early_setup(void *plat_param_from_bl2)
 {
 }
 
 /*******************************************************************************
  * Perform any BL3-1 early platform setup. Here is an opportunity to copy
- * parameters passed by the calling EL (S-EL1 in BL2 & EL3 in BL1) before they
+ * parameters passed by the calling EL (S-EL1 in BL2 & S-EL3 in BL1) before they
  * are lost (potentially). This needs to be done before the MMU is initialized
  * so that the memory layout can be used while creating page tables.
  * BL2 has flushed this information to memory, so we are guaranteed to pick up
  * good data.
  ******************************************************************************/
-void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
-				u_register_t arg2, u_register_t arg3)
+void bl31_early_platform_setup(bl31_params_t *from_bl2,
+			       void *plat_params_from_bl2)
 {
-	static console_t console;
-
-	params_early_setup(arg1);
-
-	if (rockchip_get_uart_base() != 0)
-		console_16550_register(rockchip_get_uart_base(),
-				       rockchip_get_uart_clock(),
-				       rockchip_get_uart_baudrate(), &console);
+	console_init(PLAT_RK_UART_BASE, PLAT_RK_UART_CLOCK,
+		     PLAT_RK_UART_BAUDRATE);
 
 	VERBOSE("bl31_setup\n");
 
-	bl31_params_parse_helper(arg0, &bl32_ep_info, &bl33_ep_info);
+	/* Passing a NULL context is a critical programming error */
+	assert(from_bl2);
+
+	assert(from_bl2->h.type == PARAM_BL31);
+	assert(from_bl2->h.version >= VERSION_1);
+
+	bl32_ep_info = *from_bl2->bl32_ep_info;
+	bl33_ep_info = *from_bl2->bl33_ep_info;
+
+	/* there may have some board sepcific message need to initialize */
+	params_early_setup(plat_params_from_bl2);
 }
 
 /*******************************************************************************
@@ -93,10 +109,10 @@ void bl31_plat_arch_setup(void)
 {
 	plat_cci_init();
 	plat_cci_enable();
-	plat_configure_mmu_el3(BL_CODE_BASE,
-			       BL_COHERENT_RAM_END - BL_CODE_BASE,
-			       BL_CODE_BASE,
-			       BL_CODE_END,
+	plat_configure_mmu_el3(BL31_RO_BASE,
+			       BL_COHERENT_RAM_END - BL31_RO_BASE,
+			       BL31_RO_BASE,
+			       BL31_RO_LIMIT,
 			       BL_COHERENT_RAM_BASE,
 			       BL_COHERENT_RAM_END);
 }

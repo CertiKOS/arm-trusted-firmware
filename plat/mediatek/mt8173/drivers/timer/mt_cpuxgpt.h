@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef MT_CPUXGPT_H
-#define MT_CPUXGPT_H
+#ifndef __MT_CPUXGPT_H__
+#define __MT_CPUXGPT_H__
 
 /* REG */
 #define INDEX_CNT_L_INIT    0x008
@@ -13,4 +13,4 @@
 
 void generic_timer_backup(void);
 
-#endif /* MT_CPUXGPT_H */
+#endif /* __MT_CPUXGPT_H__ */

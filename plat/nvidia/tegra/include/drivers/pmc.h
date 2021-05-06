@@ -1,18 +1,16 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PMC_H
-#define PMC_H
+#ifndef __PMC_H__
+#define __PMC_H__
 
-#include <lib/mmio.h>
-#include <lib/utils_def.h>
+#include <mmio.h>
 #include <stdbool.h>
-
 #include <tegra_def.h>
+#include <utils_def.h>
 
 #define PMC_CONFIG				U(0x0)
 #define PMC_IO_DPD_SAMPLE			U(0x20)
@@ -45,7 +43,6 @@
 #define PMC_SECURE_DISABLE3			U(0x2D8)
 #define  PMC_SECURE_DISABLE3_WRITE34_ON		(U(1) << 20)
 #define  PMC_SECURE_DISABLE3_WRITE35_ON		(U(1) << 22)
-#define PMC_SECURE_SCRATCH22			U(0x338)
 #define PMC_SECURE_SCRATCH34			U(0x368)
 #define PMC_SECURE_SCRATCH35			U(0x36c)
 #define PMC_SCRATCH56				U(0x600)
@@ -69,4 +66,4 @@ void tegra_pmc_lock_cpu_vectors(void);
 void tegra_pmc_resume(void);
 __dead2 void tegra_pmc_system_reset(void);
 
-#endif /* PMC_H */
+#endif /* __PMC_H__ */

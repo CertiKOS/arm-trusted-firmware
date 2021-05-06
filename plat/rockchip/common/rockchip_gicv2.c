@@ -1,15 +1,13 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <bl_common.h>
+#include <gicv2.h>
 #include <platform_def.h>
-
-#include <common/bl_common.h>
-#include <common/interrupt_props.h>
-#include <drivers/arm/gicv2.h>
-#include <lib/utils.h>
+#include <utils.h>
 
 /******************************************************************************
  * The following functions are defined as weak to allow a platform to override
@@ -22,10 +20,11 @@
 #pragma weak plat_rockchip_gic_pcpu_init
 
 /******************************************************************************
- * List of interrupts.
+ * On a GICv2 system, the Group 1 secure interrupts are treated as Group 0
+ * interrupts.
  *****************************************************************************/
-static const interrupt_prop_t g0_interrupt_props[] = {
-	PLAT_RK_GICV2_G0_IRQS
+const unsigned int g0_interrupt_array[] = {
+	PLAT_RK_G1S_IRQS,
 };
 
 /*
@@ -36,8 +35,8 @@ static const interrupt_prop_t g0_interrupt_props[] = {
 gicv2_driver_data_t rockchip_gic_data = {
 	.gicd_base = PLAT_RK_GICD_BASE,
 	.gicc_base = PLAT_RK_GICC_BASE,
-	.interrupt_props = g0_interrupt_props,
-	.interrupt_props_num = ARRAY_SIZE(g0_interrupt_props),
+	.g0_interrupt_num = ARRAY_SIZE(g0_interrupt_array),
+	.g0_interrupt_array = g0_interrupt_array,
 };
 
 /******************************************************************************

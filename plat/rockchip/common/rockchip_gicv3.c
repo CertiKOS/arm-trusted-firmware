@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <bl_common.h>
+#include <gicv3.h>
+#include <platform.h>
 #include <platform_def.h>
-
-#include <common/bl_common.h>
-#include <common/interrupt_props.h>
-#include <drivers/arm/gicv3.h>
-#include <lib/utils.h>
-#include <plat/common/platform.h>
+#include <utils.h>
 
 /******************************************************************************
  * The following functions are defined as weak to allow a platform to override
@@ -25,9 +23,14 @@
 /* The GICv3 driver only needs to be initialized in EL3 */
 uintptr_t rdistif_base_addrs[PLATFORM_CORE_COUNT];
 
-static const interrupt_prop_t g01s_interrupt_props[] = {
-	PLAT_RK_GICV3_G0_IRQS,
-	PLAT_RK_GICV3_G1S_IRQS
+/* Array of Group1 secure interrupts to be configured by the gic driver */
+const unsigned int g1s_interrupt_array[] = {
+	PLAT_RK_G1S_IRQS
+};
+
+/* Array of Group0 interrupts to be configured by the gic driver */
+const unsigned int g0_interrupt_array[] = {
+	PLAT_RK_G0_IRQS
 };
 
 static unsigned int plat_rockchip_mpidr_to_core_pos(unsigned long mpidr)
@@ -38,8 +41,10 @@ static unsigned int plat_rockchip_mpidr_to_core_pos(unsigned long mpidr)
 const gicv3_driver_data_t rockchip_gic_data = {
 	.gicd_base = PLAT_RK_GICD_BASE,
 	.gicr_base = PLAT_RK_GICR_BASE,
-	.interrupt_props = g01s_interrupt_props,
-	.interrupt_props_num = ARRAY_SIZE(g01s_interrupt_props),
+	.g0_interrupt_num = ARRAY_SIZE(g0_interrupt_array),
+	.g1s_interrupt_num = ARRAY_SIZE(g1s_interrupt_array),
+	.g0_interrupt_array = g0_interrupt_array,
+	.g1s_interrupt_array = g1s_interrupt_array,
 	.rdistif_num = PLATFORM_CORE_COUNT,
 	.rdistif_base_addrs = rdistif_base_addrs,
 	.mpidr_to_core_pos = plat_rockchip_mpidr_to_core_pos,

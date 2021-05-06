@@ -1,17 +1,13 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef FLOWCTRL_H
-#define FLOWCTRL_H
+#ifndef __FLOWCTRL_H__
+#define __FLOWCTRL_H__
 
-#include <lib/mmio.h>
-
-#include <stdbool.h>
-
+#include <mmio.h>
 #include <tegra_def.h>
 
 #define FLOWCTRL_HALT_CPU0_EVENTS	(0x0U)
@@ -58,7 +54,7 @@
 #define  INTERRUPT_PENDING_CORE2	(U(1) << 3)
 #define  INTERRUPT_PENDING_CORE3	(U(1) << 2)
 #define  CC4_INTERRUPT_PENDING		(U(1) << 1)
-#define  HVC_INTERRUPT_PENDING		(U(1) << 0)
+#define  HVC_INTERRUPT_PENDING		(U(1)<< 0)
 #define FLOWCTRL_CC4_CORE0_CTRL		(0x6cU)
 #define FLOWCTRL_WAIT_WFI_BITMAP	(0x100U)
 #define FLOWCTRL_L2_FLUSH_CONTROL	(0x94U)
@@ -95,4 +91,4 @@ bool tegra_fc_is_ccx_allowed(void);
 void tegra_fc_lock_active_cluster(void);
 void tegra_fc_soc_powerdn(uint32_t midr);
 
-#endif /* FLOWCTRL_H */
+#endif /* __FLOWCTRL_H__ */

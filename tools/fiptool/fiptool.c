@@ -9,12 +9,18 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#include <openssl/sha.h>
+
+#include <firmware_image_package.h>
 
 #include "fiptool.h"
 #include "tbbr_config.h"
@@ -24,17 +30,17 @@
 #define OPT_ALIGN 2
 
 static int info_cmd(int argc, char *argv[]);
-static void info_usage(int);
+static void info_usage(void);
 static int create_cmd(int argc, char *argv[]);
-static void create_usage(int);
+static void create_usage(void);
 static int update_cmd(int argc, char *argv[]);
-static void update_usage(int);
+static void update_usage(void);
 static int unpack_cmd(int argc, char *argv[]);
-static void unpack_usage(int);
+static void unpack_usage(void);
 static int remove_cmd(int argc, char *argv[]);
-static void remove_usage(int);
+static void remove_usage(void);
 static int version_cmd(int argc, char *argv[]);
-static void version_usage(int);
+static void version_usage(void);
 static int help_cmd(int argc, char *argv[]);
 static void usage(void);
 
@@ -51,7 +57,7 @@ static cmd_t cmds[] = {
 
 static image_desc_t *image_desc_head;
 static size_t nr_image_descs;
-static const uuid_t uuid_null;
+static uuid_t uuid_null = { 0 };
 static int verbose;
 
 static void vlog(int prio, const char *msg, va_list ap)
@@ -155,7 +161,7 @@ static void set_image_desc_action(image_desc_t *desc, int action,
 {
 	assert(desc != NULL);
 
-	if (desc->action_arg != (char *)DO_UNSPEC)
+	if (desc->action_arg != DO_UNSPEC)
 		free(desc->action_arg);
 	desc->action = action;
 	desc->action_arg = NULL;
@@ -169,10 +175,7 @@ static void free_image_desc(image_desc_t *desc)
 	free(desc->name);
 	free(desc->cmdline_name);
 	free(desc->action_arg);
-	if (desc->image) {
-		free(desc->image->buffer);
-		free(desc->image);
-	}
+	free(desc->image);
 	free(desc);
 }
 
@@ -215,18 +218,6 @@ static void fill_image_descs(void)
 		    toc_entry->cmdline_name);
 		add_image_desc(desc);
 	}
-#ifdef PLAT_DEF_FIP_UUID
-	for (toc_entry = plat_def_toc_entries;
-	     toc_entry->cmdline_name != NULL;
-	     toc_entry++) {
-		image_desc_t *desc;
-
-		desc = new_image_desc(&toc_entry->uuid,
-		    toc_entry->name,
-		    toc_entry->cmdline_name);
-		add_image_desc(desc);
-	}
-#endif
 }
 
 static image_desc_t *lookup_image_desc_from_uuid(const uuid_t *uuid)
@@ -253,15 +244,14 @@ static void uuid_to_str(char *s, size_t len, const uuid_t *u)
 {
 	assert(len >= (_UUID_STR_LEN + 1));
 
-	snprintf(s, len,
-	    "%02X%02X%02X%02X-%02X%02X-%02X%02X-%04X-%04X%04X%04X",
-	    u->time_low[0], u->time_low[1], u->time_low[2], u->time_low[3],
-	    u->time_mid[0], u->time_mid[1],
-	    u->time_hi_and_version[0], u->time_hi_and_version[1],
-	    (u->clock_seq_hi_and_reserved << 8) | u->clock_seq_low,
-	    (u->node[0] << 8) | u->node[1],
-	    (u->node[2] << 8) | u->node[3],
-	    (u->node[4] << 8) | u->node[5]);
+	snprintf(s, len, "%08X-%04X-%04X-%04X-%04X%04X%04X",
+	    u->time_low,
+	    u->time_mid,
+	    u->time_hi_and_version,
+	    ((uint16_t)u->clock_seq_hi_and_reserved << 8) | u->clock_seq_low,
+	    ((uint16_t)u->node[0] << 8) | u->node[1],
+	    ((uint16_t)u->node[2] << 8) | u->node[3],
+	    ((uint16_t)u->node[4] << 8) | u->node[5]);
 }
 
 static void uuid_from_str(uuid_t *u, const char *s)
@@ -274,32 +264,28 @@ static void uuid_from_str(uuid_t *u, const char *s)
 		log_errx("Invalid UUID: %s", s);
 
 	n = sscanf(s,
-	    "%2hhx%2hhx%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
-	    &u->time_low[0], &u->time_low[1], &u->time_low[2], &u->time_low[3],
-	    &u->time_mid[0], &u->time_mid[1],
-	    &u->time_hi_and_version[0], &u->time_hi_and_version[1],
-	    &u->clock_seq_hi_and_reserved, &u->clock_seq_low,
-	    &u->node[0], &u->node[1],
-	    &u->node[2], &u->node[3],
-	    &u->node[4], &u->node[5]);
+	    "%8x-%4hx-%4hx-%2hhx%2hhx-%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+	    &u->time_low, &u->time_mid, &u->time_hi_and_version,
+	    &u->clock_seq_hi_and_reserved, &u->clock_seq_low, &u->node[0],
+	    &u->node[1], &u->node[2], &u->node[3], &u->node[4], &u->node[5]);
 	/*
-	 * Given the format specifier above, we expect 16 items to be scanned
+	 * Given the format specifier above, we expect 11 items to be scanned
 	 * for a properly formatted UUID.
 	 */
-	if (n != 16)
+	if (n != 11)
 		log_errx("Invalid UUID: %s", s);
 }
 
 static int parse_fip(const char *filename, fip_toc_header_t *toc_header_out)
 {
-	struct BLD_PLAT_STAT st;
+	struct stat st;
 	FILE *fp;
 	char *buf, *bufend;
 	fip_toc_header_t *toc_header;
 	fip_toc_entry_t *toc_entry;
 	int terminated = 0;
 
-	fp = fopen(filename, "rb");
+	fp = fopen(filename, "r");
 	if (fp == NULL)
 		log_err("fopen %s", filename);
 
@@ -384,14 +370,13 @@ static int parse_fip(const char *filename, fip_toc_header_t *toc_header_out)
 
 static image_t *read_image_from_file(const uuid_t *uuid, const char *filename)
 {
-	struct BLD_PLAT_STAT st;
+	struct stat st;
 	image_t *image;
 	FILE *fp;
 
 	assert(uuid != NULL);
-	assert(filename != NULL);
 
-	fp = fopen(filename, "rb");
+	fp = fopen(filename, "r");
 	if (fp == NULL)
 		log_err("fopen %s", filename);
 
@@ -413,7 +398,7 @@ static int write_image_to_file(const image_t *image, const char *filename)
 {
 	FILE *fp;
 
-	fp = fopen(filename, "wb");
+	fp = fopen(filename, "w");
 	if (fp == NULL)
 		log_err("fopen");
 	xfwrite(image->buffer, image->toc_e.size, fp, filename);
@@ -460,7 +445,7 @@ static int info_cmd(int argc, char *argv[])
 	fip_toc_header_t toc_header;
 
 	if (argc != 2)
-		info_usage(EXIT_FAILURE);
+		info_usage();
 	argc--, argv++;
 
 	parse_fip(argv[0], &toc_header);
@@ -484,7 +469,6 @@ static int info_cmd(int argc, char *argv[])
 		       (unsigned long long)image->toc_e.offset_address,
 		       (unsigned long long)image->toc_e.size,
 		       desc->cmdline_name);
-#ifndef _MSC_VER	/* We don't have SHA256 for Visual Studio. */
 		if (verbose) {
 			unsigned char md[SHA256_DIGEST_LENGTH];
 
@@ -492,17 +476,16 @@ static int info_cmd(int argc, char *argv[])
 			printf(", sha256=");
 			md_print(md, sizeof(md));
 		}
-#endif
 		putchar('\n');
 	}
 
 	return 0;
 }
 
-static void info_usage(int exit_status)
+static void info_usage(void)
 {
 	printf("fiptool info FIP_FILENAME\n");
-	exit(exit_status);
+	exit(1);
 }
 
 static int pack_images(const char *filename, uint64_t toc_flags, unsigned long align)
@@ -512,7 +495,7 @@ static int pack_images(const char *filename, uint64_t toc_flags, unsigned long a
 	fip_toc_header_t *toc_header;
 	fip_toc_entry_t *toc_entry;
 	char *buf;
-	uint64_t entry_offset, buf_size, payload_size = 0, pad_size;
+	uint64_t entry_offset, buf_size, payload_size = 0;
 	size_t nr_images = 0;
 
 	for (desc = image_desc_head; desc != NULL; desc = desc->next)
@@ -546,16 +529,12 @@ static int pack_images(const char *filename, uint64_t toc_flags, unsigned long a
 		entry_offset += image->toc_e.size;
 	}
 
-	/*
-	 * Append a null uuid entry to mark the end of ToC entries.
-	 * NOTE the offset address for the last toc_entry must match the fip
-	 * size.
-	 */
+	/* Append a null uuid entry to mark the end of ToC entries. */
 	memset(toc_entry, 0, sizeof(*toc_entry));
-	toc_entry->offset_address = (entry_offset + align - 1) & ~(align - 1);
+	toc_entry->offset_address = entry_offset;
 
 	/* Generate the FIP file. */
-	fp = fopen(filename, "wb");
+	fp = fopen(filename, "w");
 	if (fp == NULL)
 		log_err("fopen %s", filename);
 
@@ -563,6 +542,7 @@ static int pack_images(const char *filename, uint64_t toc_flags, unsigned long a
 		log_dbgx("Metadata size: %zu bytes", buf_size);
 
 	xfwrite(buf, buf_size, fp, filename);
+	free(buf);
 
 	if (verbose)
 		log_dbgx("Payload size: %zu bytes", payload_size);
@@ -578,14 +558,6 @@ static int pack_images(const char *filename, uint64_t toc_flags, unsigned long a
 		xfwrite(image->buffer, image->toc_e.size, fp, filename);
 	}
 
-	if (fseek(fp, entry_offset, SEEK_SET))
-		log_errx("Failed to set file position");
-
-	pad_size = toc_entry->offset_address - entry_offset;
-	while (pad_size--)
-		fputc(0x0, fp);
-
-	free(buf);
 	fclose(fp);
 	return 0;
 }
@@ -681,7 +653,7 @@ static int create_cmd(int argc, char *argv[])
 	unsigned long align = 1;
 
 	if (argc < 2)
-		create_usage(EXIT_FAILURE);
+		create_usage();
 
 	opts = fill_common_opts(opts, &nr_opts, required_argument);
 	opts = add_opt(opts, &nr_opts, "plat-toc-flags", required_argument,
@@ -714,7 +686,7 @@ static int create_cmd(int argc, char *argv[])
 		case 'b': {
 			char name[_UUID_STR_LEN + 1];
 			char filename[PATH_MAX] = { 0 };
-			uuid_t uuid = uuid_null;
+			uuid_t uuid = { 0 };
 			image_desc_t *desc;
 
 			parse_blob_opt(optarg, &uuid,
@@ -722,7 +694,7 @@ static int create_cmd(int argc, char *argv[])
 
 			if (memcmp(&uuid, &uuid_null, sizeof(uuid_t)) == 0 ||
 			    filename[0] == '\0')
-				create_usage(EXIT_FAILURE);
+				create_usage();
 
 			desc = lookup_image_desc_from_uuid(&uuid);
 			if (desc == NULL) {
@@ -734,7 +706,7 @@ static int create_cmd(int argc, char *argv[])
 			break;
 		}
 		default:
-			create_usage(EXIT_FAILURE);
+			create_usage();
 		}
 	}
 	argc -= optind;
@@ -742,7 +714,7 @@ static int create_cmd(int argc, char *argv[])
 	free(opts);
 
 	if (argc == 0)
-		create_usage(EXIT_SUCCESS);
+		create_usage();
 
 	update_fip();
 
@@ -750,7 +722,7 @@ static int create_cmd(int argc, char *argv[])
 	return 0;
 }
 
-static void create_usage(int exit_status)
+static void create_usage(void)
 {
 	toc_entry_t *toc_entry = toc_entries;
 
@@ -765,13 +737,7 @@ static void create_usage(int exit_status)
 	for (; toc_entry->cmdline_name != NULL; toc_entry++)
 		printf("  --%-16s FILENAME\t%s\n", toc_entry->cmdline_name,
 		    toc_entry->name);
-#ifdef PLAT_DEF_FIP_UUID
-	toc_entry = plat_def_toc_entries;
-	for (; toc_entry->cmdline_name != NULL; toc_entry++)
-		printf("  --%-16s FILENAME\t%s\n", toc_entry->cmdline_name,
-		    toc_entry->name);
-#endif
-	exit(exit_status);
+	exit(1);
 }
 
 static int update_cmd(int argc, char *argv[])
@@ -785,7 +751,7 @@ static int update_cmd(int argc, char *argv[])
 	int pflag = 0;
 
 	if (argc < 2)
-		update_usage(EXIT_FAILURE);
+		update_usage();
 
 	opts = fill_common_opts(opts, &nr_opts, required_argument);
 	opts = add_opt(opts, &nr_opts, "align", required_argument, OPT_ALIGN);
@@ -817,7 +783,7 @@ static int update_cmd(int argc, char *argv[])
 		case 'b': {
 			char name[_UUID_STR_LEN + 1];
 			char filename[PATH_MAX] = { 0 };
-			uuid_t uuid = uuid_null;
+			uuid_t uuid = { 0 };
 			image_desc_t *desc;
 
 			parse_blob_opt(optarg, &uuid,
@@ -825,7 +791,7 @@ static int update_cmd(int argc, char *argv[])
 
 			if (memcmp(&uuid, &uuid_null, sizeof(uuid_t)) == 0 ||
 			    filename[0] == '\0')
-				update_usage(EXIT_FAILURE);
+				update_usage();
 
 			desc = lookup_image_desc_from_uuid(&uuid);
 			if (desc == NULL) {
@@ -843,7 +809,7 @@ static int update_cmd(int argc, char *argv[])
 			snprintf(outfile, sizeof(outfile), "%s", optarg);
 			break;
 		default:
-			update_usage(EXIT_FAILURE);
+			update_usage();
 		}
 	}
 	argc -= optind;
@@ -851,7 +817,7 @@ static int update_cmd(int argc, char *argv[])
 	free(opts);
 
 	if (argc == 0)
-		update_usage(EXIT_SUCCESS);
+		update_usage();
 
 	if (outfile[0] == '\0')
 		snprintf(outfile, sizeof(outfile), "%s", argv[0]);
@@ -869,7 +835,7 @@ static int update_cmd(int argc, char *argv[])
 	return 0;
 }
 
-static void update_usage(int exit_status)
+static void update_usage(void)
 {
 	toc_entry_t *toc_entry = toc_entries;
 
@@ -885,13 +851,7 @@ static void update_usage(int exit_status)
 	for (; toc_entry->cmdline_name != NULL; toc_entry++)
 		printf("  --%-16s FILENAME\t%s\n", toc_entry->cmdline_name,
 		    toc_entry->name);
-#ifdef PLAT_DEF_FIP_UUID
-	toc_entry = plat_def_toc_entries;
-	for (; toc_entry->cmdline_name != NULL; toc_entry++)
-		printf("  --%-16s FILENAME\t%s\n", toc_entry->cmdline_name,
-		    toc_entry->name);
-#endif
-	exit(exit_status);
+	exit(1);
 }
 
 static int unpack_cmd(int argc, char *argv[])
@@ -904,7 +864,7 @@ static int unpack_cmd(int argc, char *argv[])
 	int unpack_all = 1;
 
 	if (argc < 2)
-		unpack_usage(EXIT_FAILURE);
+		unpack_usage();
 
 	opts = fill_common_opts(opts, &nr_opts, required_argument);
 	opts = add_opt(opts, &nr_opts, "blob", required_argument, 'b');
@@ -931,7 +891,7 @@ static int unpack_cmd(int argc, char *argv[])
 		case 'b': {
 			char name[_UUID_STR_LEN + 1];
 			char filename[PATH_MAX] = { 0 };
-			uuid_t uuid = uuid_null;
+			uuid_t uuid = { 0 };
 			image_desc_t *desc;
 
 			parse_blob_opt(optarg, &uuid,
@@ -939,7 +899,7 @@ static int unpack_cmd(int argc, char *argv[])
 
 			if (memcmp(&uuid, &uuid_null, sizeof(uuid_t)) == 0 ||
 			    filename[0] == '\0')
-				unpack_usage(EXIT_FAILURE);
+				unpack_usage();
 
 			desc = lookup_image_desc_from_uuid(&uuid);
 			if (desc == NULL) {
@@ -958,7 +918,7 @@ static int unpack_cmd(int argc, char *argv[])
 			snprintf(outdir, sizeof(outdir), "%s", optarg);
 			break;
 		default:
-			unpack_usage(EXIT_FAILURE);
+			unpack_usage();
 		}
 	}
 	argc -= optind;
@@ -966,7 +926,7 @@ static int unpack_cmd(int argc, char *argv[])
 	free(opts);
 
 	if (argc == 0)
-		unpack_usage(EXIT_SUCCESS);
+		unpack_usage();
 
 	parse_fip(argv[0], NULL);
 
@@ -1010,7 +970,7 @@ static int unpack_cmd(int argc, char *argv[])
 	return 0;
 }
 
-static void unpack_usage(int exit_status)
+static void unpack_usage(void)
 {
 	toc_entry_t *toc_entry = toc_entries;
 
@@ -1025,15 +985,9 @@ static void unpack_usage(int exit_status)
 	for (; toc_entry->cmdline_name != NULL; toc_entry++)
 		printf("  --%-16s FILENAME\t%s\n", toc_entry->cmdline_name,
 		    toc_entry->name);
-#ifdef PLAT_DEF_FIP_UUID
-	toc_entry = plat_def_toc_entries;
-	for (; toc_entry->cmdline_name != NULL; toc_entry++)
-		printf("  --%-16s FILENAME\t%s\n", toc_entry->cmdline_name,
-		    toc_entry->name);
-#endif
 	printf("\n");
 	printf("If no options are provided, all images will be unpacked.\n");
-	exit(exit_status);
+	exit(1);
 }
 
 static int remove_cmd(int argc, char *argv[])
@@ -1047,7 +1001,7 @@ static int remove_cmd(int argc, char *argv[])
 	int fflag = 0;
 
 	if (argc < 2)
-		remove_usage(EXIT_FAILURE);
+		remove_usage();
 
 	opts = fill_common_opts(opts, &nr_opts, no_argument);
 	opts = add_opt(opts, &nr_opts, "align", required_argument, OPT_ALIGN);
@@ -1076,14 +1030,14 @@ static int remove_cmd(int argc, char *argv[])
 			break;
 		case 'b': {
 			char name[_UUID_STR_LEN + 1], filename[PATH_MAX];
-			uuid_t uuid = uuid_null;
+			uuid_t uuid = { 0 };
 			image_desc_t *desc;
 
 			parse_blob_opt(optarg, &uuid,
 			    filename, sizeof(filename));
 
 			if (memcmp(&uuid, &uuid_null, sizeof(uuid_t)) == 0)
-				remove_usage(EXIT_FAILURE);
+				remove_usage();
 
 			desc = lookup_image_desc_from_uuid(&uuid);
 			if (desc == NULL) {
@@ -1101,7 +1055,7 @@ static int remove_cmd(int argc, char *argv[])
 			snprintf(outfile, sizeof(outfile), "%s", optarg);
 			break;
 		default:
-			remove_usage(EXIT_FAILURE);
+			remove_usage();
 		}
 	}
 	argc -= optind;
@@ -1109,7 +1063,7 @@ static int remove_cmd(int argc, char *argv[])
 	free(opts);
 
 	if (argc == 0)
-		remove_usage(EXIT_SUCCESS);
+		remove_usage();
 
 	if (outfile[0] != '\0' && access(outfile, F_OK) == 0 && !fflag)
 		log_errx("File %s already exists, use --force to overwrite it",
@@ -1140,7 +1094,7 @@ static int remove_cmd(int argc, char *argv[])
 	return 0;
 }
 
-static void remove_usage(int exit_status)
+static void remove_usage(void)
 {
 	toc_entry_t *toc_entry = toc_entries;
 
@@ -1156,13 +1110,7 @@ static void remove_usage(int exit_status)
 	for (; toc_entry->cmdline_name != NULL; toc_entry++)
 		printf("  --%-16s\t%s\n", toc_entry->cmdline_name,
 		    toc_entry->name);
-#ifdef PLAT_DEF_FIP_UUID
-	toc_entry = plat_def_toc_entries;
-	for (; toc_entry->cmdline_name != NULL; toc_entry++)
-		printf("  --%-16s\t%s\n", toc_entry->cmdline_name,
-		    toc_entry->name);
-#endif
-	exit(exit_status);
+	exit(1);
 }
 
 static int version_cmd(int argc, char *argv[])
@@ -1176,10 +1124,10 @@ static int version_cmd(int argc, char *argv[])
 	return 0;
 }
 
-static void version_usage(int exit_status)
+static void version_usage(void)
 {
 	printf("fiptool version\n");
-	exit(exit_status);
+	exit(1);
 }
 
 static int help_cmd(int argc, char *argv[])
@@ -1193,7 +1141,7 @@ static int help_cmd(int argc, char *argv[])
 	for (i = 0; i < NELEM(cmds); i++) {
 		if (strcmp(cmds[i].name, argv[0]) == 0 &&
 		    cmds[i].usage != NULL)
-			cmds[i].usage(EXIT_SUCCESS);
+			cmds[i].usage();
 	}
 	if (i == NELEM(cmds))
 		printf("No help for subcommand '%s'\n", argv[0]);
@@ -1214,7 +1162,7 @@ static void usage(void)
 	printf("  remove\tRemove images from FIP.\n");
 	printf("  version\tShow fiptool version.\n");
 	printf("  help\t\tShow help for given command.\n");
-	exit(EXIT_SUCCESS);
+	exit(1);
 }
 
 int main(int argc, char *argv[])

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -13,6 +13,12 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
+#if USE_TBBR_DEFS
+#include <tbbr_oid.h>
+#else
+#include <platform_oid.h>
+#endif
+
 #include "cert.h"
 #include "cmd_opt.h"
 #include "debug.h"
@@ -20,9 +26,6 @@
 #include "sha.h"
 
 #define MAX_FILENAME_LEN		1024
-
-key_t *keys;
-unsigned int num_keys;
 
 /*
  * Create a new key container
@@ -38,48 +41,28 @@ int key_new(key_t *key)
 	return 1;
 }
 
-static int key_create_rsa(key_t *key, int key_bits)
+static int key_create_rsa(key_t *key)
 {
-	BIGNUM *e;
-	RSA *rsa = NULL;
+	RSA *rsa;
 
-	e = BN_new();
-	if (e == NULL) {
-		printf("Cannot create RSA exponent\n");
-		goto err;
-	}
-
-	if (!BN_set_word(e, RSA_F4)) {
-		printf("Cannot assign RSA exponent\n");
-		goto err;
-	}
-
-	rsa = RSA_new();
+	rsa = RSA_generate_key(RSA_KEY_BITS, RSA_F4, NULL, NULL);
 	if (rsa == NULL) {
 		printf("Cannot create RSA key\n");
 		goto err;
 	}
-
-	if (!RSA_generate_key_ex(rsa, key_bits, e, NULL)) {
-		printf("Cannot generate RSA key\n");
-		goto err;
-	}
-
 	if (!EVP_PKEY_assign_RSA(key->key, rsa)) {
 		printf("Cannot assign RSA key\n");
 		goto err;
 	}
 
-	BN_free(e);
 	return 1;
 err:
 	RSA_free(rsa);
-	BN_free(e);
 	return 0;
 }
 
 #ifndef OPENSSL_NO_EC
-static int key_create_ecdsa(key_t *key, int key_bits)
+static int key_create_ecdsa(key_t *key)
 {
 	EC_KEY *ec;
 
@@ -106,15 +89,15 @@ err:
 }
 #endif /* OPENSSL_NO_EC */
 
-typedef int (*key_create_fn_t)(key_t *key, int key_bits);
+typedef int (*key_create_fn_t)(key_t *key);
 static const key_create_fn_t key_create_fn[KEY_ALG_MAX_NUM] = {
-	key_create_rsa, 	/* KEY_ALG_RSA */
+	key_create_rsa,
 #ifndef OPENSSL_NO_EC
-	key_create_ecdsa, 	/* KEY_ALG_ECDSA */
+	key_create_ecdsa,
 #endif /* OPENSSL_NO_EC */
 };
 
-int key_create(key_t *key, int type, int key_bits)
+int key_create(key_t *key, int type)
 {
 	if (type >= KEY_ALG_MAX_NUM) {
 		printf("Invalid key type\n");
@@ -122,7 +105,7 @@ int key_create(key_t *key, int type, int key_bits)
 	}
 
 	if (key_create_fn[type]) {
-		return key_create_fn[type](key, key_bits);
+		return key_create_fn[type](key);
 	}
 
 	return 0;
@@ -184,28 +167,6 @@ int key_init(void)
 	cmd_opt_t cmd_opt;
 	key_t *key;
 	unsigned int i;
-
-	keys = malloc((num_def_keys * sizeof(def_keys[0]))
-#ifdef PDEF_KEYS
-		      + (num_pdef_keys * sizeof(pdef_keys[0]))
-#endif
-		      );
-
-	if (keys == NULL) {
-		ERROR("%s:%d Failed to allocate memory.\n", __func__, __LINE__);
-		return 1;
-	}
-
-	memcpy(&keys[0], &def_keys[0], (num_def_keys * sizeof(def_keys[0])));
-#ifdef PDEF_KEYS
-	memcpy(&keys[num_def_keys], &pdef_keys[0],
-		(num_pdef_keys * sizeof(pdef_keys[0])));
-
-	num_keys = num_def_keys + num_pdef_keys;
-#else
-	num_keys = num_def_keys;
-#endif
-		   ;
 
 	for (i = 0; i < num_keys; i++) {
 		key = &keys[i];

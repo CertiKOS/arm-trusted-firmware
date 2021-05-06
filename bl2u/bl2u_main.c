@@ -1,23 +1,20 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <stdint.h>
-
-#include <platform_def.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <bl1/bl1.h>
-#include <bl2u/bl2u.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/auth/auth_mod.h>
-#include <drivers/console.h>
-#include <plat/common/platform.h>
+#include <assert.h>
+#include <auth_mod.h>
+#include <bl_common.h>
+#include <bl1.h>
+#include <console.h>
+#include <debug.h>
+#include <platform.h>
+#include <platform_def.h>
+#include <stdint.h>
 
 /*******************************************************************************
  * This function is responsible to:
@@ -34,7 +31,7 @@ void bl2u_main(void)
 	int rc;
 	/* Load the subsequent bootloader images */
 	rc = bl2u_plat_handle_scp_bl2u();
-	if (rc != 0) {
+	if (rc) {
 		ERROR("Failed to load SCP_BL2U (%i)\n", rc);
 		panic();
 	}
@@ -45,14 +42,14 @@ void bl2u_main(void)
 
 	console_flush();
 
-#ifndef __aarch64__
+#ifdef AARCH32
 	/*
 	 * For AArch32 state BL1 and BL2U share the MMU setup.
 	 * Given that BL2U does not map BL1 regions, MMU needs
 	 * to be disabled in order to go back to BL1.
 	 */
 	disable_mmu_icache_secure();
-#endif /* !__aarch64__ */
+#endif /* AARCH32 */
 
 	/*
 	 * Indicate that BL2U is done and resume back to

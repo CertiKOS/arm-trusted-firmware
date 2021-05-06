@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TSP_PRIVATE_H
-#define TSP_PRIVATE_H
+#ifndef __TSP_PRIVATE_H__
+#define __TSP_PRIVATE_H__
 
 /* Definitions to help the assembler access the SMC/ERET args structure */
 #define TSP_ARGS_SIZE		0x40
@@ -20,15 +20,14 @@
 #define TSP_ARGS_END		0x40
 
 
-#ifndef __ASSEMBLER__
+#ifndef __ASSEMBLY__
 
-#include <stdint.h>
-
+#include <cassert.h>
 #include <platform_def.h> /* For CACHE_WRITEBACK_GRANULE */
+#include <spinlock.h>
+#include <stdint.h>
+#include <tsp.h>
 
-#include <bl32/tsp/tsp.h>
-#include <lib/cassert.h>
-#include <lib/spinlock.h>
 
 typedef struct work_statistics {
 	/* Number of s-el1 interrupts on this cpu */
@@ -61,9 +60,9 @@ typedef struct tsp_args {
  */
 CASSERT(TSP_ARGS_SIZE == sizeof(tsp_args_t), assert_sp_args_size_mismatch);
 
-uint128_t tsp_get_magic(void);
+void tsp_get_magic(uint64_t args[4]);
 
-tsp_args_t *tsp_cpu_resume_main(uint64_t max_off_pwrlvl,
+tsp_args_t *tsp_cpu_resume_main(uint64_t arg0,
 				uint64_t arg1,
 				uint64_t arg2,
 				uint64_t arg3,
@@ -107,47 +106,8 @@ extern work_statistics_t tsp_stats[PLATFORM_CORE_COUNT];
 /* Vector table of jumps */
 extern tsp_vectors_t tsp_vector_table;
 
-/* functions */
-int32_t tsp_common_int_handler(void);
-int32_t tsp_handle_preemption(void);
 
-tsp_args_t *tsp_abort_smc_handler(uint64_t func,
-				  uint64_t arg1,
-				  uint64_t arg2,
-				  uint64_t arg3,
-				  uint64_t arg4,
-				  uint64_t arg5,
-				  uint64_t arg6,
-				  uint64_t arg7);
+#endif /* __ASSEMBLY__ */
 
-tsp_args_t *tsp_smc_handler(uint64_t func,
-			       uint64_t arg1,
-			       uint64_t arg2,
-			       uint64_t arg3,
-			       uint64_t arg4,
-			       uint64_t arg5,
-			       uint64_t arg6,
-			       uint64_t arg7);
+#endif /* __TSP_PRIVATE_H__ */
 
-tsp_args_t *tsp_system_reset_main(uint64_t arg0,
-				uint64_t arg1,
-				uint64_t arg2,
-				uint64_t arg3,
-				uint64_t arg4,
-				uint64_t arg5,
-				uint64_t arg6,
-				uint64_t arg7);
-
-tsp_args_t *tsp_system_off_main(uint64_t arg0,
-				uint64_t arg1,
-				uint64_t arg2,
-				uint64_t arg3,
-				uint64_t arg4,
-				uint64_t arg5,
-				uint64_t arg6,
-				uint64_t arg7);
-
-uint64_t tsp_main(void);
-#endif /* __ASSEMBLER__ */
-
-#endif /* TSP_PRIVATE_H */

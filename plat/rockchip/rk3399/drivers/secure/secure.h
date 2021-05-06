@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SECURE_H
-#define SECURE_H
+#ifndef __PLAT_ROCKCHIP_RK3399_DRIVER_SECURE_H__
+#define __PLAT_ROCKCHIP_RK3399_DRIVER_SECURE_H__
 
 /**************************************************
  * sgrf reg, offset
@@ -95,11 +95,10 @@
 #define PCLK_WDT_CM0_GATE_SHIFT		10
 
 /* export secure operating APIs */
-void secure_watchdog_gate(void);
-__pmusramfunc void secure_watchdog_ungate(void);
+void secure_watchdog_disable(void);
+void secure_watchdog_enable(void);
 void secure_timer_init(void);
 void secure_sgrf_init(void);
 void secure_sgrf_ddr_rgn_init(void);
-__pmusramfunc void sram_secure_timer_init(void);
 
-#endif /* SECURE_H */
+#endif /* __PLAT_ROCKCHIP_RK3399_DRIVER_SECURE_H__ */

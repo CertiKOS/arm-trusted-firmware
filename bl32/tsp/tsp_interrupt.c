@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <bl32/tsp/tsp.h>
-#include <common/debug.h>
-#include <plat/common/platform.h>
-
+#include <assert.h>
+#include <debug.h>
+#include <platform.h>
+#include <platform_def.h>
+#include <tsp.h>
 #include "tsp_private.h"
 
 /*******************************************************************************
@@ -36,7 +33,7 @@ void tsp_update_sync_sel1_intr_stats(uint32_t type, uint64_t elr_el3)
 
 #if LOG_LEVEL >= LOG_LEVEL_VERBOSE
 	spin_lock(&console_lock);
-	VERBOSE("TSP: cpu 0x%lx sync s-el1 interrupt request from 0x%llx\n",
+	VERBOSE("TSP: cpu 0x%lx sync s-el1 interrupt request from 0x%lx\n",
 		read_mpidr(), elr_el3);
 	VERBOSE("TSP: cpu 0x%lx: %d sync s-el1 interrupt requests,"
 		" %d sync s-el1 interrupt returns\n",

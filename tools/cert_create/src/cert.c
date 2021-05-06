@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -15,6 +15,12 @@
 #include <openssl/sha.h>
 #include <openssl/x509v3.h>
 
+#if USE_TBBR_DEFS
+#include <tbbr_oid.h>
+#else
+#include <platform_oid.h>
+#endif
+
 #include "cert.h"
 #include "cmd_opt.h"
 #include "debug.h"
@@ -23,9 +29,6 @@
 
 #define SERIAL_RAND_BITS	64
 #define RSA_SALT_LEN		32
-
-cert_t *certs;
-unsigned int num_certs;
 
 int rand_serial(BIGNUM *b, ASN1_INTEGER *ai)
 {
@@ -53,19 +56,6 @@ error:
 
 	return ret;
 }
-const EVP_MD *get_digest(int alg)
-{
-	switch (alg) {
-	case HASH_ALG_SHA256:
-		return EVP_sha256();
-	case HASH_ALG_SHA384:
-		return EVP_sha384();
-	case HASH_ALG_SHA512:
-		return EVP_sha512();
-	default:
-		return NULL;
-	}
-}
 
 int cert_add_ext(X509 *issuer, X509 *subject, int nid, char *value)
 {
@@ -89,12 +79,7 @@ int cert_add_ext(X509 *issuer, X509 *subject, int nid, char *value)
 	return 1;
 }
 
-int cert_new(
-	int md_alg,
-	cert_t *cert,
-	int days,
-	int ca,
-	STACK_OF(X509_EXTENSION) * sk)
+int cert_new(cert_t *cert, int days, int ca, STACK_OF(X509_EXTENSION) * sk)
 {
 	EVP_PKEY *pkey = keys[cert->key].key;
 	cert_t *issuer_cert = &certs[cert->issuer];
@@ -105,7 +90,7 @@ int cert_new(
 	X509_NAME *name;
 	ASN1_INTEGER *sno;
 	int i, num, rc = 0;
-	EVP_MD_CTX *mdCtx;
+	EVP_MD_CTX  mdCtx;
 	EVP_PKEY_CTX *pKeyCtx = NULL;
 
 	/* Create the certificate structure */
@@ -126,37 +111,25 @@ int cert_new(
 		issuer = x;
 	}
 
-	mdCtx = EVP_MD_CTX_create();
-	if (mdCtx == NULL) {
+	EVP_MD_CTX_init(&mdCtx);
+	if (!EVP_DigestSignInit(&mdCtx, &pKeyCtx, EVP_sha256(), NULL, ikey)) {
 		ERR_print_errors_fp(stdout);
 		goto END;
 	}
 
-	/* Sign the certificate with the issuer key */
-	if (!EVP_DigestSignInit(mdCtx, &pKeyCtx, get_digest(md_alg), NULL, ikey)) {
+	if (!EVP_PKEY_CTX_set_rsa_padding(pKeyCtx, RSA_PKCS1_PSS_PADDING)) {
 		ERR_print_errors_fp(stdout);
 		goto END;
 	}
 
-	/*
-	 * Set additional parameters if issuing public key algorithm is RSA.
-	 * This is not required for ECDSA.
-	 */
-	if (EVP_PKEY_base_id(ikey) == EVP_PKEY_RSA) {
-		if (!EVP_PKEY_CTX_set_rsa_padding(pKeyCtx, RSA_PKCS1_PSS_PADDING)) {
-			ERR_print_errors_fp(stdout);
-			goto END;
-		}
+	if (!EVP_PKEY_CTX_set_rsa_pss_saltlen(pKeyCtx, RSA_SALT_LEN)) {
+		ERR_print_errors_fp(stdout);
+		goto END;
+	}
 
-		if (!EVP_PKEY_CTX_set_rsa_pss_saltlen(pKeyCtx, RSA_SALT_LEN)) {
-			ERR_print_errors_fp(stdout);
-			goto END;
-		}
-
-		if (!EVP_PKEY_CTX_set_rsa_mgf1_md(pKeyCtx, get_digest(md_alg))) {
-			ERR_print_errors_fp(stdout);
-			goto END;
-		}
+	if (!EVP_PKEY_CTX_set_rsa_mgf1_md(pKeyCtx, EVP_sha256())) {
+		ERR_print_errors_fp(stdout);
+		goto END;
 	}
 
 	/* x509.v3 */
@@ -203,7 +176,7 @@ int cert_new(
 		}
 	}
 
-	if (!X509_sign_ctx(x, mdCtx)) {
+	if (!X509_sign_ctx(x, &mdCtx)) {
 		ERR_print_errors_fp(stdout);
 		goto END;
 	}
@@ -213,7 +186,7 @@ int cert_new(
 	cert->x = x;
 
 END:
-	EVP_MD_CTX_destroy(mdCtx);
+	EVP_MD_CTX_cleanup(&mdCtx);
 	return rc;
 }
 
@@ -222,28 +195,6 @@ int cert_init(void)
 	cmd_opt_t cmd_opt;
 	cert_t *cert;
 	unsigned int i;
-
-	certs = malloc((num_def_certs * sizeof(def_certs[0]))
-#ifdef PDEF_CERTS
-		       + (num_pdef_certs * sizeof(pdef_certs[0]))
-#endif
-		       );
-	if (certs == NULL) {
-		ERROR("%s:%d Failed to allocate memory.\n", __func__, __LINE__);
-		return 1;
-	}
-
-	memcpy(&certs[0], &def_certs[0],
-	       (num_def_certs * sizeof(def_certs[0])));
-
-#ifdef PDEF_CERTS
-	memcpy(&certs[num_def_certs], &pdef_certs[0],
-	       (num_pdef_certs * sizeof(pdef_certs[0])));
-
-	num_certs = num_def_certs + num_pdef_certs;
-#else
-	num_certs = num_def_certs;
-#endif
 
 	for (i = 0; i < num_certs; i++) {
 		cert = &certs[i];

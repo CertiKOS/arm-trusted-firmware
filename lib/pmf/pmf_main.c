@@ -1,19 +1,16 @@
 /*
- * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <assert.h>
-#include <errno.h>
-#include <string.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <lib/pmf/pmf.h>
-#include <lib/utils_def.h>
-#include <plat/common/platform.h>
+#include <assert.h>
+#include <debug.h>
+#include <errno.h>
+#include <platform.h>
+#include <pmf.h>
+#include <string.h>
 
 /*******************************************************************************
  * The 'pmf_svc_descs' array holds the PMF service descriptors exported by
@@ -24,13 +21,16 @@
  * index of the descriptor in the 'pmf_svc_descs' array  which contains the
  * service function pointers.
  ******************************************************************************/
-
-IMPORT_SYM(uintptr_t, __PMF_SVC_DESCS_START__,		PMF_SVC_DESCS_START);
-IMPORT_SYM(uintptr_t, __PMF_SVC_DESCS_END__,		PMF_SVC_DESCS_END);
-IMPORT_SYM(uintptr_t, __PMF_PERCPU_TIMESTAMP_END__,	PMF_PERCPU_TIMESTAMP_END);
-IMPORT_SYM(uintptr_t,  __PMF_TIMESTAMP_START__,		PMF_TIMESTAMP_ARRAY_START);
-
-#define PMF_PERCPU_TIMESTAMP_SIZE	(PMF_PERCPU_TIMESTAMP_END - PMF_TIMESTAMP_ARRAY_START)
+extern uintptr_t __PMF_SVC_DESCS_START__;
+extern uintptr_t __PMF_SVC_DESCS_END__;
+#define PMF_SVC_DESCS_START		((uintptr_t)(&__PMF_SVC_DESCS_START__))
+#define PMF_SVC_DESCS_END		((uintptr_t)(&__PMF_SVC_DESCS_END__))
+extern void *__PERCPU_TIMESTAMP_SIZE__;
+#define PMF_PERCPU_TIMESTAMP_SIZE	((uintptr_t)&__PERCPU_TIMESTAMP_SIZE__)
+extern uintptr_t __PMF_TIMESTAMP_START__;
+#define PMF_TIMESTAMP_ARRAY_START	((uintptr_t)&__PMF_TIMESTAMP_START__)
+extern uintptr_t __PMF_TIMESTAMP_END__;
+#define PMF_TIMESTAMP_ARRAY_END		((uintptr_t)&__PMF_TIMESTAMP_END__)
 
 #define PMF_SVC_DESCS_MAX		10
 
@@ -69,15 +69,15 @@ int pmf_setup(void)
 	pmf_svc_descs = (pmf_svc_desc_t *) PMF_SVC_DESCS_START;
 	for (ii = 0; ii < pmf_svc_descs_num; ii++) {
 
-		assert(pmf_svc_descs[ii].get_ts != NULL);
+		assert(pmf_svc_descs[ii].get_ts);
 
 		/*
 		 * Call the initialization routine for this
 		 * PMF service, if it is defined.
 		 */
-		if (pmf_svc_descs[ii].init != NULL) {
+		if (pmf_svc_descs[ii].init) {
 			rc = pmf_svc_descs[ii].init();
-			if (rc != 0) {
+			if (rc) {
 				WARN("Could not initialize PMF"
 					"service %s - skipping \n",
 					pmf_svc_descs[ii].name);
@@ -127,7 +127,7 @@ static pmf_svc_desc_t *get_service(unsigned int tid)
 	if (pmf_num_services == 0)
 		return NULL;
 
-	assert(pmf_svc_descs != NULL);
+	assert(pmf_svc_descs);
 
 	do {
 		mid = (low + high) / 2;
@@ -160,7 +160,7 @@ int pmf_get_timestamp_smc(unsigned int tid,
 		unsigned long long *ts_value)
 {
 	pmf_svc_desc_t *svc_desc;
-	assert(ts_value != NULL);
+	assert(ts_value);
 
 	/* Search for registered service. */
 	svc_desc = get_service(tid);
@@ -181,7 +181,7 @@ int pmf_get_timestamp_smc(unsigned int tid,
  */
 void __pmf_dump_timestamp(unsigned int tid, unsigned long long ts)
 {
-	printf("PMF:cpu %u	tid %u	ts %llu\n",
+	tf_printf("PMF:cpu %u	tid %u	ts %llu\n",
 		plat_my_core_pos(), tid, ts);
 }
 
@@ -249,7 +249,7 @@ unsigned long long __pmf_get_timestamp(uintptr_t base_addr,
 	unsigned long long *ts_addr = (unsigned long long *)calc_ts_addr(base_addr,
 				tid, cpuid);
 
-	if ((flags & PMF_CACHE_MAINT) != 0U)
+	if (flags & PMF_CACHE_MAINT)
 		inv_dcache_range((uintptr_t)ts_addr, sizeof(unsigned long long));
 
 	return *ts_addr;

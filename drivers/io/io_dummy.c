@@ -5,12 +5,10 @@
  */
 
 #include <assert.h>
+#include <debug.h>
+#include <io_driver.h>
+#include <io_storage.h>
 #include <string.h>
-
-#include <common/debug.h>
-#include <drivers/io/io_driver.h>
-#include <drivers/io/io_dummy.h>
-#include <drivers/io/io_storage.h>
 
 struct file_state {
 	int in_use;
@@ -20,7 +18,7 @@ struct file_state {
 static struct file_state current_file = {0};
 
 /* Identify the device type as dummy */
-static io_type_t device_type_dummy(void)
+io_type_t device_type_dummy(void)
 {
 	return IO_TYPE_DUMMY;
 }

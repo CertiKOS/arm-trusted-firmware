@@ -1,18 +1,17 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <hikey_def.h>
+#include "../hikey_def.h"
 
 	.globl	plat_my_core_pos
 	.globl	platform_mem_init
 	.globl	plat_crash_console_init
 	.globl	plat_crash_console_putc
-	.globl	plat_crash_console_flush
 	.globl	plat_report_exception
 	.globl	plat_reset_handler
 
@@ -46,7 +45,7 @@ func plat_crash_console_init
 	mov_imm	x0, CRASH_CONSOLE_BASE
 	mov_imm	x1, PL011_UART_CLK_IN_HZ
 	mov_imm	x2, PL011_BAUDRATE
-	b	console_pl011_core_init
+	b	console_core_init
 endfunc plat_crash_console_init
 
 	/* ---------------------------------------------
@@ -58,21 +57,8 @@ endfunc plat_crash_console_init
 	 */
 func plat_crash_console_putc
 	mov_imm	x1, CRASH_CONSOLE_BASE
-	b	console_pl011_core_putc
+	b	console_core_putc
 endfunc plat_crash_console_putc
-
-	/* ---------------------------------------------
-	 * void plat_crash_console_flush()
-	 * Function to force a write of all buffered
-	 * data that hasn't been output.
-	 * Out : void.
-	 * Clobber list : x0, x1
-	 * ---------------------------------------------
-	 */
-func plat_crash_console_flush
-	mov_imm	x0, CRASH_CONSOLE_BASE
-	b	console_pl011_core_flush
-endfunc plat_crash_console_flush
 
 	/* ---------------------------------------------
 	 * void plat_report_exception(unsigned int type)

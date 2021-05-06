@@ -1,16 +1,13 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef COMMON_DEF_H
-#define COMMON_DEF_H
+#ifndef __COMMON_DEF_H__
+#define __COMMON_DEF_H__
 
+#include <bl_common.h>
 #include <platform_def.h>
-
-#include <common/bl_common.h>
-#include <lib/utils_def.h>
-#include <lib/xlat_tables/xlat_tables_defs.h>
 
 /******************************************************************************
  * Required platform porting definitions that are expected to be common to
@@ -20,19 +17,20 @@
 /*
  * Platform binary types for linking
  */
-#ifdef __aarch64__
-#define PLATFORM_LINKER_FORMAT          "elf64-littleaarch64"
-#define PLATFORM_LINKER_ARCH            aarch64
-#else
+#ifdef AARCH32
 #define PLATFORM_LINKER_FORMAT          "elf32-littlearm"
 #define PLATFORM_LINKER_ARCH            arm
-#endif /* __aarch64__ */
+#else
+#define PLATFORM_LINKER_FORMAT          "elf64-littleaarch64"
+#define PLATFORM_LINKER_ARCH            aarch64
+#endif /* AARCH32 */
 
 /*
  * Generic platform constants
  */
 #define FIRMWARE_WELCOME_STR		"Booting Trusted Firmware\n"
 
+#if LOAD_IMAGE_V2
 #define BL2_IMAGE_DESC {				\
 	.image_id = BL2_IMAGE_ID,			\
 	SET_STATIC_PARAM_HEAD(image_info, PARAM_EP,	\
@@ -43,6 +41,17 @@
 		VERSION_2, entry_point_info_t, SECURE | EXECUTABLE),\
 	.ep_info.pc = BL2_BASE,				\
 }
+#else /* LOAD_IMAGE_V2 */
+#define BL2_IMAGE_DESC {				\
+	.image_id = BL2_IMAGE_ID,			\
+	SET_STATIC_PARAM_HEAD(image_info, PARAM_EP,	\
+		VERSION_1, image_info_t, 0),		\
+	.image_info.image_base = BL2_BASE,		\
+	SET_STATIC_PARAM_HEAD(ep_info, PARAM_EP,	\
+		VERSION_1, entry_point_info_t, SECURE | EXECUTABLE),\
+	.ep_info.pc = BL2_BASE,				\
+}
+#endif /* LOAD_IMAGE_V2 */
 
 /*
  * The following constants identify the extents of the code & read-only data
@@ -65,24 +74,33 @@
  * page of it with the right memory attributes.
  */
 #if SEPARATE_CODE_AND_RODATA
+#define BL_CODE_BASE		(unsigned long)(&__TEXT_START__)
+#define BL_CODE_END		(unsigned long)(&__TEXT_END__)
+#define BL_RO_DATA_BASE		(unsigned long)(&__RODATA_START__)
+#define BL_RO_DATA_END		(unsigned long)(&__RODATA_END__)
 
 #define BL1_CODE_END		BL_CODE_END
-#define BL1_RO_DATA_BASE	BL_RO_DATA_BASE
+#define BL1_RO_DATA_BASE	(unsigned long)(&__RODATA_START__)
 #define BL1_RO_DATA_END		round_up(BL1_ROM_END, PAGE_SIZE)
-#if BL2_IN_XIP_MEM
-#define BL2_CODE_END		BL_CODE_END
-#define BL2_RO_DATA_BASE	BL_RO_DATA_BASE
-#define BL2_RO_DATA_END		round_up(BL2_ROM_END, PAGE_SIZE)
-#endif /* BL2_IN_XIP_MEM */
 #else
-#define BL_RO_DATA_BASE		UL(0)
-#define BL_RO_DATA_END		UL(0)
+#define BL_CODE_BASE		(unsigned long)(&__RO_START__)
+#define BL_CODE_END		(unsigned long)(&__RO_END__)
+#define BL_RO_DATA_BASE		0
+#define BL_RO_DATA_END		0
+
 #define BL1_CODE_END		round_up(BL1_ROM_END, PAGE_SIZE)
-#if BL2_IN_XIP_MEM
-#define BL2_RO_DATA_BASE	UL(0)
-#define BL2_RO_DATA_END		UL(0)
-#define BL2_CODE_END		round_up(BL2_ROM_END, PAGE_SIZE)
-#endif /* BL2_IN_XIP_MEM */
+#define BL1_RO_DATA_BASE	0
+#define BL1_RO_DATA_END		0
 #endif /* SEPARATE_CODE_AND_RODATA */
 
-#endif /* COMMON_DEF_H */
+/*
+ * The next 2 constants identify the extents of the coherent memory region.
+ * These addresses are used by the MMU setup code and therefore they must be
+ * page-aligned.  It is the responsibility of the linker script to ensure that
+ * __COHERENT_RAM_START__ and __COHERENT_RAM_END__ linker symbols refer to
+ * page-aligned addresses.
+ */
+#define BL_COHERENT_RAM_BASE	(unsigned long)(&__COHERENT_RAM_START__)
+#define BL_COHERENT_RAM_END	(unsigned long)(&__COHERENT_RAM_END__)
+
+#endif /* __COMMON_DEF_H__ */

@@ -1,72 +1,40 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <bl_common.h>
 #include <errno.h>
+#include <platform.h>
+#include <plat_arm.h>
+#include <sp805.h>
+#include <tbbr_img_def.h>
+#include <v2m_def.h>
 
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/tbbr/tbbr_img_def.h>
-#include <drivers/arm/css/sds.h>
-#include <drivers/arm/sp805.h>
-#include <plat/arm/common/plat_arm.h>
-#include <plat/arm/common/arm_def.h>
-#include <plat/common/platform.h>
-#include <platform_def.h>
+#define RESET_REASON_WDOG_RESET		(0x2)
 
 void juno_reset_to_aarch32_state(void);
 
-static int is_watchdog_reset(void)
-{
-#if !CSS_USE_SCMI_SDS_DRIVER
-	#define RESET_REASON_WDOG_RESET		(0x2)
-	const uint32_t *reset_flags_ptr = (const uint32_t *)SSC_GPRETN;
-
-	if ((*reset_flags_ptr & RESET_REASON_WDOG_RESET) != 0)
-		return 1;
-
-	return 0;
-#else
-	int ret;
-	uint32_t scp_reset_synd_flags;
-
-	ret = sds_init();
-	if (ret != SDS_OK) {
-		ERROR("SCP SDS initialization failed\n");
-		panic();
-	}
-
-	ret = sds_struct_read(SDS_RESET_SYNDROME_STRUCT_ID,
-					SDS_RESET_SYNDROME_OFFSET,
-					&scp_reset_synd_flags,
-					SDS_RESET_SYNDROME_SIZE,
-					SDS_ACCESS_MODE_NON_CACHED);
-	if (ret != SDS_OK) {
-		ERROR("Getting reset reason from SDS failed\n");
-		panic();
-	}
-
-	/* Check if the WATCHDOG_RESET_BIT is set in the reset syndrome */
-	if (scp_reset_synd_flags & SDS_RESET_SYNDROME_AP_WD_RESET_BIT)
-		return 1;
-
-	return 0;
-#endif
-}
 
 /*******************************************************************************
  * The following function checks if Firmware update is needed,
  * by checking if TOC in FIP image is valid or watchdog reset happened.
  ******************************************************************************/
-bool plat_arm_bl1_fwu_needed(void)
+unsigned int bl1_plat_get_next_image_id(void)
 {
-	const int32_t *nv_flags_ptr = (const int32_t *)V2M_SYS_NVFLAGS_ADDR;
+	unsigned int *reset_flags_ptr = (unsigned int *)SSC_GPRETN;
+	unsigned int *nv_flags_ptr = (unsigned int *)
+			(V2M_SYSREGS_BASE + V2M_SYS_NVFLAGS);
+	/*
+	 * Check if TOC is invalid or watchdog reset happened.
+	 */
+	if ((arm_io_is_toc_valid() != 1) ||
+		((*reset_flags_ptr & RESET_REASON_WDOG_RESET) &&
+		((*nv_flags_ptr == -EAUTH) || (*nv_flags_ptr == -ENOENT))))
+		return NS_BL1U_IMAGE_ID;
 
-	/* Check if TOC is invalid or watchdog reset happened. */
-	return (!arm_io_is_toc_valid() || (((*nv_flags_ptr == -EAUTH) ||
-		(*nv_flags_ptr == -ENOENT)) && is_watchdog_reset()));
+	return BL2_IMAGE_ID;
 }
 
 /*******************************************************************************
@@ -94,10 +62,7 @@ __dead2 void bl1_plat_fwu_done(void *client_cookie, void *reserved)
 	/* Clear the NV flags register. */
 	*nv_flags_clr = *nv_flags_ptr;
 
-	/* Setup the watchdog to reset the system as soon as possible */
-	sp805_refresh(ARM_SP805_TWDG_BASE, 1U);
-
-	while (true)
+	while (1)
 		wfi();
 }
 
@@ -112,13 +77,3 @@ void bl1_plat_prepare_exit(entry_point_info_t *ep_info)
 	juno_reset_to_aarch32_state();
 }
 #endif /* JUNO_AARCH32_EL3_RUNTIME */
-
-void plat_arm_secure_wdt_start(void)
-{
-	sp805_start(ARM_SP805_TWDG_BASE, ARM_TWDG_LOAD_VAL);
-}
-
-void plat_arm_secure_wdt_stop(void)
-{
-	sp805_stop(ARM_SP805_TWDG_BASE);
-}

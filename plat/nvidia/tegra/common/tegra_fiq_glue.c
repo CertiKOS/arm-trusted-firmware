@@ -1,25 +1,22 @@
 /*
- * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
-#include <bl31/interrupt_mgmt.h>
-#include <bl31/ehf.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
+#include <assert.h>
+#include <bl_common.h>
 #include <context.h>
+#include <context_mgmt.h>
+#include <debug.h>
 #include <denver.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <plat/common/platform.h>
-
 #if ENABLE_WDT_LEGACY_FIQ_HANDLING
 #include <flowctrl.h>
 #endif
+#include <gic_v2.h>
+#include <interrupt_mgmt.h>
+#include <platform.h>
 #include <tegra_def.h>
 #include <tegra_private.h>
 
@@ -36,16 +33,25 @@ static pcpu_fiq_state_t fiq_state[PLATFORM_CORE_COUNT];
 /*******************************************************************************
  * Handler for FIQ interrupts
  ******************************************************************************/
-static int tegra_fiq_interrupt_handler(unsigned int id, unsigned int flags,
-		void *handle, void *cookie)
+static uint64_t tegra_fiq_interrupt_handler(uint32_t id,
+					  uint32_t flags,
+					  void *handle,
+					  void *cookie)
 {
 	cpu_context_t *ctx = cm_get_context(NON_SECURE);
 	el3_state_t *el3state_ctx = get_el3state_ctx(ctx);
 	uint32_t cpu = plat_my_core_pos();
+	uint32_t irq;
 
+	(void)id;
 	(void)flags;
 	(void)handle;
 	(void)cookie;
+
+	/*
+	 * Read the pending interrupt ID
+	 */
+	irq = plat_ic_get_pending_interrupt_id();
 
 	/*
 	 * Jump to NS world only if the NS world's FIQ handler has
@@ -82,7 +88,8 @@ static int tegra_fiq_interrupt_handler(unsigned int id, unsigned int flags,
 	 * disable the routing so that we can mark it as "complete" in the
 	 * GIC later.
 	 */
-	if (id == LEGACY_FIQ_PPI_WDT) {
+	if (irq == LEGACY_FIQ_PPI_WDT) {
+		gicd_write_sgir(TEGRA_GICD_BASE, ((1 << 24) | 0xf));
 		tegra_fc_disable_fiq_to_ccplex_routing();
 	}
 #endif
@@ -90,7 +97,10 @@ static int tegra_fiq_interrupt_handler(unsigned int id, unsigned int flags,
 	/*
 	 * Mark this interrupt as complete to avoid a FIQ storm.
 	 */
-	plat_ic_end_of_interrupt(id);
+	if (irq < 1022U) {
+		(void)plat_ic_acknowledge_interrupt();
+		plat_ic_end_of_interrupt(irq);
+	}
 
 	return 0;
 }
@@ -100,13 +110,23 @@ static int tegra_fiq_interrupt_handler(unsigned int id, unsigned int flags,
  ******************************************************************************/
 void tegra_fiq_handler_setup(void)
 {
+	uint32_t flags;
+	int32_t rc;
+
 	/* return if already registered */
 	if (fiq_handler_active == 0U) {
 		/*
 		 * Register an interrupt handler for FIQ interrupts generated for
 		 * NS interrupt sources
 		 */
-		ehf_register_priority_handler(PLAT_TEGRA_WDT_PRIO, tegra_fiq_interrupt_handler);
+		flags = 0U;
+		set_interrupt_rm_flag((flags), (NON_SECURE));
+		rc = register_interrupt_type_handler(INTR_TYPE_EL3,
+					tegra_fiq_interrupt_handler,
+					flags);
+		if (rc != 0) {
+			panic();
+		}
 
 		/* handler is now active */
 		fiq_handler_active = 1;
@@ -128,7 +148,7 @@ int32_t tegra_fiq_get_intr_context(void)
 {
 	cpu_context_t *ctx = cm_get_context(NON_SECURE);
 	gp_regs_t *gpregs_ctx = get_gpregs_ctx(ctx);
-	const el1_sysregs_t *el1state_ctx = get_el1_sysregs_ctx(ctx);
+	const el1_sys_regs_t *el1state_ctx = get_sysregs_ctx(ctx);
 	uint32_t cpu = plat_my_core_pos();
 	uint64_t val;
 

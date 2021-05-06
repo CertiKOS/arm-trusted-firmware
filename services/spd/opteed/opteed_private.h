@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef OPTEED_PRIVATE_H
-#define OPTEED_PRIVATE_H
-
-#include <platform_def.h>
+#ifndef __OPTEED_PRIVATE_H__
+#define __OPTEED_PRIVATE_H__
 
 #include <arch.h>
-#include <bl31/interrupt_mgmt.h>
 #include <context.h>
-#include <lib/psci/psci.h>
+#include <interrupt_mgmt.h>
+#include <platform_def.h>
+#include <psci.h>
 
 /*******************************************************************************
  * OPTEE PM state information e.g. OPTEE is suspended, uninitialised etc
@@ -79,11 +78,10 @@
 #define OPTEED_C_RT_CTX_SIZE		0x60
 #define OPTEED_C_RT_CTX_ENTRIES		(OPTEED_C_RT_CTX_SIZE >> DWORD_SHIFT)
 
-#ifndef __ASSEMBLER__
+#ifndef __ASSEMBLY__
 
+#include <cassert.h>
 #include <stdint.h>
-
-#include <lib/cassert.h>
 
 typedef uint32_t optee_vector_isn_t;
 
@@ -146,17 +144,14 @@ uint64_t opteed_enter_sp(uint64_t *c_rt_ctx);
 void __dead2 opteed_exit_sp(uint64_t c_rt_ctx, uint64_t ret);
 uint64_t opteed_synchronous_sp_entry(optee_context_t *optee_ctx);
 void __dead2 opteed_synchronous_sp_exit(optee_context_t *optee_ctx, uint64_t ret);
-void opteed_init_optee_ep_state(struct entry_point_info *optee_entry_point,
+void opteed_init_optee_ep_state(struct entry_point_info *optee_ep,
 				uint32_t rw,
 				uint64_t pc,
-				uint64_t pageable_part,
-				uint64_t mem_limit,
-				uint64_t dt_addr,
 				optee_context_t *optee_ctx);
 
 extern optee_context_t opteed_sp_context[OPTEED_CORE_COUNT];
 extern uint32_t opteed_rw;
-extern struct optee_vectors *optee_vector_table;
-#endif /*__ASSEMBLER__*/
+extern struct optee_vectors *optee_vectors;
+#endif /*__ASSEMBLY__*/
 
-#endif /* OPTEED_PRIVATE_H */
+#endif /* __OPTEED_PRIVATE_H__ */

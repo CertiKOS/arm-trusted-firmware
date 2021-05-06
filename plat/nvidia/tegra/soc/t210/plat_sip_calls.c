@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,18 +7,17 @@
 #include <arch.h>
 #include <arch_helpers.h>
 #include <assert.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
+#include <bl_common.h>
+#include <debug.h>
 #include <errno.h>
-#include <lib/mmio.h>
-#include <lib/utils_def.h>
-
 #include <memctrl.h>
+#include <mmio.h>
 #include <pmc.h>
+#include <runtime_svc.h>
 #include <tegra_private.h>
 #include <tegra_platform.h>
 #include <tegra_def.h>
+#include <utils_def.h>
 
 /*******************************************************************************
  * PMC parameters
@@ -71,7 +69,7 @@ int plat_sip_handler(uint32_t smc_fid,
 		case PMC_CRYPTO_OP_0:
 		case PMC_TSC_MULT_0:
 		case PMC_STICKY_BIT:
-			ERROR("%s: error offset=0x%llx\n", __func__, x2);
+			ERROR("%s: error offset=0x%lx\n", __func__, x2);
 			return -EFAULT;
 		default:
 			/* Valid register */
@@ -87,7 +85,7 @@ int plat_sip_handler(uint32_t smc_fid,
 		} else {
 			return -EINVAL;
 		}
-	} else {
+        } else {
 		return -ENOTSUP;
 	}
 	return 0;

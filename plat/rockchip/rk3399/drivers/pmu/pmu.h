@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PMU_H
-#define PMU_H
+#ifndef __PMU_H__
+#define __PMU_H__
 
 #include <pmu_bits.h>
 #include <pmu_regs.h>
@@ -53,7 +53,7 @@ enum pmu_core_pwrst_shift {
 #define TSADC_INT_PIN		38
 #define CORES_PM_DISABLE	0x0
 
-#define PD_CTR_LOOP		10000
+#define PD_CTR_LOOP		500
 #define CHK_CPU_LOOP		500
 #define MAX_WAIT_COUNT		1000
 
@@ -136,6 +136,5 @@ struct pmu_slpdata_s {
 extern uint32_t clst_warmboot_data[PLATFORM_CLUSTER_COUNT];
 
 extern void sram_func_set_ddrctl_pll(uint32_t pll_src);
-void pmu_power_domains_on(void);
 
-#endif /* PMU_H */
+#endif /* __PMU_H__ */

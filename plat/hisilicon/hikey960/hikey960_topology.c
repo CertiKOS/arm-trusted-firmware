@@ -3,11 +3,9 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <platform_def.h>
-
 #include <arch.h>
-#include <lib/psci/psci.h>
+#include <platform_def.h>
+#include <psci.h>
 
 /*
  * The HiKey power domain tree descriptor. The cluster power domains

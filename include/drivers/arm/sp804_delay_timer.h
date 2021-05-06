@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SP804_DELAY_TIMER_H
-#define SP804_DELAY_TIMER_H
+#ifndef __SP804_DELAY_TIMER_H__
+#define __SP804_DELAY_TIMER_H__
 
+#include <delay_timer.h>
 #include <stdint.h>
 
-#include <drivers/delay_timer.h>
 
 uint32_t sp804_get_timer_value(void);
 
@@ -25,4 +25,4 @@ void sp804_timer_ops_init(uintptr_t base_addr, const timer_ops_t *ops);
 		sp804_timer_ops_init((base_addr), &sp804_timer_ops);	\
 	} while (0)
 
-#endif /* SP804_DELAY_TIMER_H */
+#endif /* __SP804_DELAY_TIMER_H__ */

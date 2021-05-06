@@ -1,54 +1,31 @@
 /*
- * Copyright (c) 2017-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
-
+#include <gicv3.h>
+#include <platform.h>
 #include <platform_def.h>
-
-#include <drivers/arm/gicv3.h>
-#include <common/interrupt_props.h>
-#include <plat/common/platform.h>
 
 #include "uniphier.h"
 
 static uintptr_t uniphier_rdistif_base_addrs[PLATFORM_CORE_COUNT];
 
-static const interrupt_prop_t uniphier_interrupt_props[] = {
-	/* G0 interrupts */
+static const unsigned int g0_interrupt_array[] = {
+	8,	/* SGI0 */
+	14,	/* SGI6 */
+};
 
-	/* SGI0 */
-	INTR_PROP_DESC(8, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP0,
-		       GIC_INTR_CFG_EDGE),
-	/* SGI6 */
-	INTR_PROP_DESC(14, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP0,
-		       GIC_INTR_CFG_EDGE),
-
-	/* G1S interrupts */
-
-	/* Timer */
-	INTR_PROP_DESC(29, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_LEVEL),
-	/* SGI1 */
-	INTR_PROP_DESC(9, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_EDGE),
-	/* SGI2 */
-	INTR_PROP_DESC(10, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_EDGE),
-	/* SGI3 */
-	INTR_PROP_DESC(11, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_EDGE),
-	/* SGI4 */
-	INTR_PROP_DESC(12, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_EDGE),
-	/* SGI5 */
-	INTR_PROP_DESC(13, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_EDGE),
-	/* SGI7 */
-	INTR_PROP_DESC(15, GIC_HIGHEST_SEC_PRIORITY, INTR_GROUP1S,
-		       GIC_INTR_CFG_EDGE)
+static const unsigned int g1s_interrupt_array[] = {
+	29,	/* Timer */
+	9,	/* SGI1 */
+	10,	/* SGI2 */
+	11,	/* SGI3 */
+	12,	/* SGI4 */
+	13,	/* SGI5 */
+	15,	/* SGI7 */
 };
 
 static unsigned int uniphier_mpidr_to_core_pos(u_register_t mpidr)
@@ -60,8 +37,10 @@ static const struct gicv3_driver_data uniphier_gic_driver_data[] = {
 	[UNIPHIER_SOC_LD11] = {
 		.gicd_base = 0x5fe00000,
 		.gicr_base = 0x5fe40000,
-		.interrupt_props = uniphier_interrupt_props,
-		.interrupt_props_num = ARRAY_SIZE(uniphier_interrupt_props),
+		.g0_interrupt_num = ARRAY_SIZE(g0_interrupt_array),
+		.g1s_interrupt_num = ARRAY_SIZE(g1s_interrupt_array),
+		.g0_interrupt_array = g0_interrupt_array,
+		.g1s_interrupt_array = g1s_interrupt_array,
 		.rdistif_num = PLATFORM_CORE_COUNT,
 		.rdistif_base_addrs = uniphier_rdistif_base_addrs,
 		.mpidr_to_core_pos = uniphier_mpidr_to_core_pos,
@@ -69,8 +48,10 @@ static const struct gicv3_driver_data uniphier_gic_driver_data[] = {
 	[UNIPHIER_SOC_LD20] = {
 		.gicd_base = 0x5fe00000,
 		.gicr_base = 0x5fe80000,
-		.interrupt_props = uniphier_interrupt_props,
-		.interrupt_props_num = ARRAY_SIZE(uniphier_interrupt_props),
+		.g0_interrupt_num = ARRAY_SIZE(g0_interrupt_array),
+		.g1s_interrupt_num = ARRAY_SIZE(g1s_interrupt_array),
+		.g0_interrupt_array = g0_interrupt_array,
+		.g1s_interrupt_array = g1s_interrupt_array,
 		.rdistif_num = PLATFORM_CORE_COUNT,
 		.rdistif_base_addrs = uniphier_rdistif_base_addrs,
 		.mpidr_to_core_pos = uniphier_mpidr_to_core_pos,
@@ -78,8 +59,10 @@ static const struct gicv3_driver_data uniphier_gic_driver_data[] = {
 	[UNIPHIER_SOC_PXS3] = {
 		.gicd_base = 0x5fe00000,
 		.gicr_base = 0x5fe80000,
-		.interrupt_props = uniphier_interrupt_props,
-		.interrupt_props_num = ARRAY_SIZE(uniphier_interrupt_props),
+		.g0_interrupt_num = ARRAY_SIZE(g0_interrupt_array),
+		.g1s_interrupt_num = ARRAY_SIZE(g1s_interrupt_array),
+		.g0_interrupt_array = g0_interrupt_array,
+		.g1s_interrupt_array = g1s_interrupt_array,
 		.rdistif_num = PLATFORM_CORE_COUNT,
 		.rdistif_base_addrs = uniphier_rdistif_base_addrs,
 		.mpidr_to_core_pos = uniphier_mpidr_to_core_pos,

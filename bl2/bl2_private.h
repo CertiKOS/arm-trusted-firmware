@@ -1,13 +1,11 @@
 /*
- * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef BL2_PRIVATE_H
-#define BL2_PRIVATE_H
-
-#include <common/bl_common.h>
+#ifndef __BL2_PRIVATE_H__
+#define __BL2_PRIVATE_H__
 
 /******************************************
  * Forward declarations
@@ -19,6 +17,5 @@ struct entry_point_info;
  *****************************************/
 void bl2_arch_setup(void);
 struct entry_point_info *bl2_load_images(void);
-void bl2_run_next_image(const struct entry_point_info *bl_ep_info);
 
-#endif /* BL2_PRIVATE_H */
+#endif /* __BL2_PRIVATE_H__ */

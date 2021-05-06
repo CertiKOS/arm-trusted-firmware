@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,11 +7,10 @@
 #include <arch.h>
 #include <asm_macros.S>
 #include <assert_macros.S>
+#include <cpu_data.h>
 #include <cpu_macros.S>
-#include <common/bl_common.h>
-#include <lib/el3_runtime/cpu_data.h>
 
-#if defined(IMAGE_BL1) || defined(IMAGE_BL32) || (defined(IMAGE_BL2) && BL2_AT_EL3)
+#if defined(IMAGE_BL1) || defined(IMAGE_BL32)
 	/*
 	 * The reset handler common to all platforms.  After a matching
 	 * cpu_ops structure entry is found, the correponding reset_handler
@@ -22,9 +21,9 @@
 	 */
 	.globl	reset_handler
 func reset_handler
-	mov	r8, lr
+	mov	r10, lr
 
-	/* The plat_reset_handler can clobber r0 - r7 */
+	/* The plat_reset_handler can clobber r0 - r9 */
 	bl	plat_reset_handler
 
 	/* Get the matching cpu_ops pointer (clobbers: r0 - r5) */
@@ -38,12 +37,12 @@ func reset_handler
 	/* Get the cpu_ops reset handler */
 	ldr	r1, [r0, #CPU_RESET_FUNC]
 	cmp	r1, #0
-	mov	lr, r8
+	mov	lr, r10
 	bxne	r1
 	bx	lr
 endfunc reset_handler
 
-#endif
+#endif /* IMAGE_BL1 || IMAGE_BL32 */
 
 #ifdef IMAGE_BL32 /* The power down core and cluster is needed only in  BL32 */
 	/*
@@ -78,10 +77,6 @@ func prepare_cpu_pwr_dwn
 	mov	r1, #CPU_PWR_DWN_OPS
 	add	r1, r1, r2, lsl #2
 	ldr	r1, [r0, r1]
-#if ENABLE_ASSERTIONS
-	cmp	r1, #0
-	ASM_ASSERT(ne)
-#endif
 	bx	r1
 endfunc prepare_cpu_pwr_dwn
 
@@ -150,10 +145,6 @@ func get_cpu_ops_ptr
 
 	/* Subtract the increment and offset to get the cpu-ops pointer */
 	sub	r0, r4, #(CPU_OPS_SIZE + CPU_MIDR)
-#if ENABLE_ASSERTIONS
-	cmp	r0, #0
-	ASM_ASSERT(ne)
-#endif
 error_exit:
 	bx	lr
 endfunc get_cpu_ops_ptr
@@ -215,8 +206,7 @@ endfunc cpu_rev_var_hs
  */
 	.globl print_errata_status
 func print_errata_status
-	/* r12 is pushed only for the sake of 8-byte stack alignment */
-	push	{r4, r5, r12, lr}
+	push	{r4, lr}
 #ifdef IMAGE_BL1
 	/*
 	 * BL1 doesn't have per-CPU data. So retrieve the CPU operations
@@ -232,15 +222,7 @@ func print_errata_status
 	 * function. If it's non-NULL, jump to the function in turn.
 	 */
 	bl	_cpu_data
-#if ENABLE_ASSERTIONS
-	cmp	r0, #0
-	ASM_ASSERT(ne)
-#endif
 	ldr	r1, [r0, #CPU_DATA_CPU_OPS_PTR]
-#if ENABLE_ASSERTIONS
-	cmp	r1, #0
-	ASM_ASSERT(ne)
-#endif
 	ldr	r0, [r1, #CPU_ERRATA_FUNC]
 	cmp	r0, #0
 	beq	1f
@@ -259,6 +241,6 @@ func print_errata_status
 	blxne	r4
 1:
 #endif
-	pop	{r4, r5, r12, pc}
+	pop	{r4, pc}
 endfunc print_errata_status
 #endif

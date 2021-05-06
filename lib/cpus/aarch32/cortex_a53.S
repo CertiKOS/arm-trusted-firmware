@@ -1,15 +1,14 @@
 /*
- * Copyright (c) 2017-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include <arch.h>
 #include <asm_macros.S>
 #include <assert_macros.S>
-#include <common/debug.h>
 #include <cortex_a53.h>
 #include <cpu_macros.S>
+#include <debug.h>
 
 #if A53_DISABLE_NON_TEMPORAL_HINT
 #undef ERRATA_A53_836870
@@ -28,36 +27,6 @@ func cortex_a53_disable_smp
 	dsb	sy
 	bx	lr
 endfunc cortex_a53_disable_smp
-
-	/* ---------------------------------------------------
-	 * Errata Workaround for Cortex A53 Errata #819472.
-	 * This applies only to revision <= r0p1 of Cortex A53.
-	 * ---------------------------------------------------
-	 */
-func check_errata_819472
-	/*
-	 * Even though this is only needed for revision <= r0p1, it
-	 * is always applied due to limitations of the current
-	 * errata framework.
-	 */
-	mov	r0, #ERRATA_APPLIES
-	bx	lr
-endfunc check_errata_819472
-
-	/* ---------------------------------------------------
-	 * Errata Workaround for Cortex A53 Errata #824069.
-	 * This applies only to revision <= r0p2 of Cortex A53.
-	 * ---------------------------------------------------
-	 */
-func check_errata_824069
-	/*
-	 * Even though this is only needed for revision <= r0p2, it
-	 * is always applied due to limitations of the current
-	 * errata framework.
-	 */
-	mov	r0, #ERRATA_APPLIES
-	bx	lr
-endfunc check_errata_824069
 
 	/* --------------------------------------------------
 	 * Errata Workaround for Cortex A53 Errata #826319.
@@ -89,21 +58,6 @@ func check_errata_826319
 	b	cpu_rev_var_ls
 endfunc check_errata_826319
 
-	/* ---------------------------------------------------
-	 * Errata Workaround for Cortex A53 Errata #827319.
-	 * This applies only to revision <= r0p2 of Cortex A53.
-	 * ---------------------------------------------------
-	 */
-func check_errata_827319
-	/*
-	 * Even though this is only needed for revision <= r0p2, it
-	 * is always applied due to limitations of the current
-	 * errata framework.
-	 */
-	mov	r0, #ERRATA_APPLIES
-	bx	lr
-endfunc check_errata_827319
-
 	/* ---------------------------------------------------------------------
 	 * Disable the cache non-temporal hint.
 	 *
@@ -130,9 +84,9 @@ func a53_disable_non_temporal_hint
 	mov		lr, r2
 	cmp		r0, #ERRATA_NOT_APPLIES
 	beq		1f
-	ldcopr16	r0, r1, CORTEX_A53_CPUACTLR
-	orr64_imm	r0, r1, CORTEX_A53_CPUACTLR_DTAH
-	stcopr16	r0, r1, CORTEX_A53_CPUACTLR
+	ldcopr16	r0, r1, CORTEX_A53_ACTLR
+	orr64_imm	r0, r1, CORTEX_A53_ACTLR_DTAH
+	stcopr16	r0, r1, CORTEX_A53_ACTLR
 1:
 	bx		lr
 endfunc a53_disable_non_temporal_hint
@@ -164,9 +118,9 @@ func errata_a53_855873_wa
 	mov		lr, r2
 	cmp		r0, #ERRATA_NOT_APPLIES
 	beq		1f
-	ldcopr16	r0, r1, CORTEX_A53_CPUACTLR
-	orr64_imm	r0, r1, CORTEX_A53_CPUACTLR_ENDCCASCI
-	stcopr16	r0, r1, CORTEX_A53_CPUACTLR
+	ldcopr16	r0, r1, CORTEX_A53_ACTLR
+	orr64_imm	r0, r1, CORTEX_A53_ACTLR_ENDCCASCI
+	stcopr16	r0, r1, CORTEX_A53_ACTLR
 1:
 	bx		lr
 endfunc errata_a53_855873_wa
@@ -220,7 +174,7 @@ func cortex_a53_core_pwr_dwn
 	push	{r12, lr}
 
 	/* Assert if cache is enabled */
-#if ENABLE_ASSERTIONS
+#if ASM_ASSERTION
 	ldcopr	r0, SCTLR
 	tst	r0, #SCTLR_C_BIT
 	ASM_ASSERT(eq)
@@ -250,7 +204,7 @@ func cortex_a53_cluster_pwr_dwn
 	push	{r12, lr}
 
 	/* Assert if cache is enabled */
-#if ENABLE_ASSERTIONS
+#if ASM_ASSERTION
 	ldcopr	r0, SCTLR
 	tst	r0, #SCTLR_C_BIT
 	ASM_ASSERT(eq)
@@ -298,10 +252,7 @@ func cortex_a53_errata_report
 	 * Report all errata. The revision-variant information is passed to
 	 * checking functions of each errata.
 	 */
-	report_errata ERRATA_A53_819472, cortex_a53, 819472
-	report_errata ERRATA_A53_824069, cortex_a53, 824069
 	report_errata ERRATA_A53_826319, cortex_a53, 826319
-	report_errata ERRATA_A53_827319, cortex_a53, 827319
 	report_errata ERRATA_A53_836870, cortex_a53, disable_non_temporal_hint
 	report_errata ERRATA_A53_855873, cortex_a53, 855873
 

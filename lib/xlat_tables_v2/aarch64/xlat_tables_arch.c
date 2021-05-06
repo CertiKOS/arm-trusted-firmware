@@ -1,97 +1,71 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
-
 #include <arch.h>
-#include <arch_features.h>
 #include <arch_helpers.h>
-#include <lib/cassert.h>
-#include <lib/utils_def.h>
-#include <lib/xlat_tables/xlat_tables_v2.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <cassert.h>
+#include <common_def.h>
+#include <platform_def.h>
+#include <sys/types.h>
+#include <utils.h>
+#include <xlat_tables_v2.h>
 #include "../xlat_tables_private.h"
 
-/*
- * Returns true if the provided granule size is supported, false otherwise.
- */
-bool xlat_arch_is_granule_size_supported(size_t size)
-{
-	u_register_t id_aa64mmfr0_el1 = read_id_aa64mmfr0_el1();
+#if defined(IMAGE_BL1) || defined(IMAGE_BL31)
+# define IMAGE_EL	3
+#else
+# define IMAGE_EL	1
+#endif
 
-	if (size == PAGE_SIZE_4KB) {
-		return ((id_aa64mmfr0_el1 >> ID_AA64MMFR0_EL1_TGRAN4_SHIFT) &
-			 ID_AA64MMFR0_EL1_TGRAN4_MASK) ==
-			 ID_AA64MMFR0_EL1_TGRAN4_SUPPORTED;
-	} else if (size == PAGE_SIZE_16KB) {
-		return ((id_aa64mmfr0_el1 >> ID_AA64MMFR0_EL1_TGRAN16_SHIFT) &
-			 ID_AA64MMFR0_EL1_TGRAN16_MASK) ==
-			 ID_AA64MMFR0_EL1_TGRAN16_SUPPORTED;
-	} else if (size == PAGE_SIZE_64KB) {
-		return ((id_aa64mmfr0_el1 >> ID_AA64MMFR0_EL1_TGRAN64_SHIFT) &
-			 ID_AA64MMFR0_EL1_TGRAN64_MASK) ==
-			 ID_AA64MMFR0_EL1_TGRAN64_SUPPORTED;
-	} else {
-		return 0;
-	}
-}
+static uint64_t tcr_ps_bits;
 
-size_t xlat_arch_get_max_supported_granule_size(void)
-{
-	if (xlat_arch_is_granule_size_supported(PAGE_SIZE_64KB)) {
-		return PAGE_SIZE_64KB;
-	} else if (xlat_arch_is_granule_size_supported(PAGE_SIZE_16KB)) {
-		return PAGE_SIZE_16KB;
-	} else {
-		assert(xlat_arch_is_granule_size_supported(PAGE_SIZE_4KB));
-		return PAGE_SIZE_4KB;
-	}
-}
-
-unsigned long long tcr_physical_addr_size_bits(unsigned long long max_addr)
+static uint64_t calc_physical_addr_size_bits(
+					uint64_t max_addr)
 {
 	/* Physical address can't exceed 48 bits */
 	assert((max_addr & ADDR_MASK_48_TO_63) == 0U);
 
 	/* 48 bits address */
-	if ((max_addr & ADDR_MASK_44_TO_47) != 0U)
+	if ((max_addr & ADDR_MASK_44_TO_47) != 0U) {
 		return TCR_PS_BITS_256TB;
+	}
 
 	/* 44 bits address */
-	if ((max_addr & ADDR_MASK_42_TO_43) != 0U)
+	if ((max_addr & ADDR_MASK_42_TO_43) != 0U) {
 		return TCR_PS_BITS_16TB;
+	}
 
 	/* 42 bits address */
-	if ((max_addr & ADDR_MASK_40_TO_41) != 0U)
+	if ((max_addr & ADDR_MASK_40_TO_41) != 0U) {
 		return TCR_PS_BITS_4TB;
+	}
 
 	/* 40 bits address */
-	if ((max_addr & ADDR_MASK_36_TO_39) != 0U)
+	if ((max_addr & ADDR_MASK_36_TO_39) != 0U) {
 		return TCR_PS_BITS_1TB;
+	}
 
 	/* 36 bits address */
-	if ((max_addr & ADDR_MASK_32_TO_35) != 0U)
+	if ((max_addr & ADDR_MASK_32_TO_35) != 0U) {
 		return TCR_PS_BITS_64GB;
+	}
 
 	return TCR_PS_BITS_4GB;
 }
 
 #if ENABLE_ASSERTIONS
-/*
- * Physical Address ranges supported in the AArch64 Memory Model. Value 0b110 is
- * supported in ARMv8.2 onwards.
- */
-static const unsigned int pa_range_bits_arr[] = {
+/* Physical Address ranges supported in the AArch64 Memory Model */
+static const uint32_t pa_range_bits_arr[] = {
 	PARANGE_0000, PARANGE_0001, PARANGE_0010, PARANGE_0011, PARANGE_0100,
-	PARANGE_0101, PARANGE_0110
+	PARANGE_0101
 };
 
-unsigned long long xlat_arch_get_max_supported_pa(void)
+static uint64_t xlat_arch_get_max_supported_pa(void)
 {
 	u_register_t pa_range = read_id_aa64mmfr0_el1() &
 						ID_AA64MMFR0_EL1_PARANGE_MASK;
@@ -101,63 +75,22 @@ unsigned long long xlat_arch_get_max_supported_pa(void)
 
 	return (1ULL << pa_range_bits_arr[pa_range]) - 1ULL;
 }
-
-/*
- * Return minimum virtual address space size supported by the architecture
- */
-uintptr_t xlat_get_min_virt_addr_space_size(void)
-{
-	uintptr_t ret;
-
-	if (is_armv8_4_ttst_present())
-		ret = MIN_VIRT_ADDR_SPACE_SIZE_TTST;
-	else
-		ret = MIN_VIRT_ADDR_SPACE_SIZE;
-
-	return ret;
-}
 #endif /* ENABLE_ASSERTIONS*/
 
-bool is_mmu_enabled_ctx(const xlat_ctx_t *ctx)
+bool is_mmu_enabled(void)
 {
-	if (ctx->xlat_regime == EL1_EL0_REGIME) {
-		assert(xlat_arch_current_el() >= 1U);
-		return (read_sctlr_el1() & SCTLR_M_BIT) != 0U;
-	} else if (ctx->xlat_regime == EL2_REGIME) {
-		assert(xlat_arch_current_el() >= 2U);
-		return (read_sctlr_el2() & SCTLR_M_BIT) != 0U;
-	} else {
-		assert(ctx->xlat_regime == EL3_REGIME);
-		assert(xlat_arch_current_el() >= 3U);
-		return (read_sctlr_el3() & SCTLR_M_BIT) != 0U;
-	}
+#if IMAGE_EL == 1
+	assert(IS_IN_EL(1));
+	return (read_sctlr_el1() & SCTLR_M_BIT) != 0U;
+#elif IMAGE_EL == 3
+	assert(IS_IN_EL(3));
+	return (read_sctlr_el3() & SCTLR_M_BIT) != 0U;
+#endif
 }
 
-bool is_dcache_enabled(void)
-{
-	unsigned int el = get_current_el_maybe_constant();
+#if PLAT_XLAT_TABLES_DYNAMIC
 
-	if (el == 1U) {
-		return (read_sctlr_el1() & SCTLR_C_BIT) != 0U;
-	} else if (el == 2U) {
-		return (read_sctlr_el2() & SCTLR_C_BIT) != 0U;
-	} else {
-		return (read_sctlr_el3() & SCTLR_C_BIT) != 0U;
-	}
-}
-
-uint64_t xlat_arch_regime_get_xn_desc(int xlat_regime)
-{
-	if (xlat_regime == EL1_EL0_REGIME) {
-		return UPPER_ATTRS(UXN) | UPPER_ATTRS(PXN);
-	} else {
-		assert((xlat_regime == EL2_REGIME) ||
-		       (xlat_regime == EL3_REGIME));
-		return UPPER_ATTRS(XN);
-	}
-}
-
-void xlat_arch_tlbi_va(uintptr_t va, int xlat_regime)
+void xlat_arch_tlbi_va(uintptr_t va)
 {
 	/*
 	 * Ensure the translation table write has drained into memory before
@@ -165,24 +98,13 @@ void xlat_arch_tlbi_va(uintptr_t va, int xlat_regime)
 	 */
 	dsbishst();
 
-	/*
-	 * This function only supports invalidation of TLB entries for the EL3
-	 * and EL1&0 translation regimes.
-	 *
-	 * Also, it is architecturally UNDEFINED to invalidate TLBs of a higher
-	 * exception level (see section D4.9.2 of the ARM ARM rev B.a).
-	 */
-	if (xlat_regime == EL1_EL0_REGIME) {
-		assert(xlat_arch_current_el() >= 1U);
-		tlbivaae1is(TLBI_ADDR(va));
-	} else if (xlat_regime == EL2_REGIME) {
-		assert(xlat_arch_current_el() >= 2U);
-		tlbivae2is(TLBI_ADDR(va));
-	} else {
-		assert(xlat_regime == EL3_REGIME);
-		assert(xlat_arch_current_el() >= 3U);
-		tlbivae3is(TLBI_ADDR(va));
-	}
+#if IMAGE_EL == 1
+	assert(IS_IN_EL(1));
+	tlbivaae1is(TLBI_ADDR(va));
+#elif IMAGE_EL == 3
+	assert(IS_IN_EL(3));
+	tlbivae3is(TLBI_ADDR(va));
+#endif
 }
 
 void xlat_arch_tlbi_va_sync(void)
@@ -208,90 +130,136 @@ void xlat_arch_tlbi_va_sync(void)
 	isb();
 }
 
-unsigned int xlat_arch_current_el(void)
-{
-	unsigned int el = (unsigned int)GET_EL(read_CurrentEl());
+#endif /* PLAT_XLAT_TABLES_DYNAMIC */
 
-	assert(el > 0U);
+int32_t xlat_arch_current_el(void)
+{
+	int32_t el = (int32_t)GET_EL(read_CurrentEl());
+
+	assert(el > 0);
 
 	return el;
 }
 
-void setup_mmu_cfg(uint64_t *params, unsigned int flags,
-		   const uint64_t *base_table, unsigned long long max_pa,
-		   uintptr_t max_va, int xlat_regime)
+uint64_t xlat_arch_get_xn_desc(int32_t el)
 {
-	uint64_t mair, ttbr0, tcr;
-	uintptr_t virtual_addr_space_size;
-
-	/* Set attributes in the right indices of the MAIR. */
-	mair = MAIR_ATTR_SET(ATTR_DEVICE, ATTR_DEVICE_INDEX);
-	mair |= MAIR_ATTR_SET(ATTR_IWBWA_OWBWA_NTR, ATTR_IWBWA_OWBWA_NTR_INDEX);
-	mair |= MAIR_ATTR_SET(ATTR_NON_CACHEABLE, ATTR_NON_CACHEABLE_INDEX);
-
-	/*
-	 * Limit the input address ranges and memory region sizes translated
-	 * using TTBR0 to the given virtual address space size.
-	 */
-	assert(max_va < ((uint64_t)UINTPTR_MAX));
-
-	virtual_addr_space_size = (uintptr_t)max_va + 1U;
-
-	assert(virtual_addr_space_size >=
-		xlat_get_min_virt_addr_space_size());
-	assert(virtual_addr_space_size <= MAX_VIRT_ADDR_SPACE_SIZE);
-	assert(IS_POWER_OF_TWO(virtual_addr_space_size));
-
-	/*
-	 * __builtin_ctzll(0) is undefined but here we are guaranteed that
-	 * virtual_addr_space_size is in the range [1,UINTPTR_MAX].
-	 */
-	int t0sz = 64 - __builtin_ctzll(virtual_addr_space_size);
-
-	tcr = (uint64_t)t0sz << TCR_T0SZ_SHIFT;
-
-	/*
-	 * Set the cacheability and shareability attributes for memory
-	 * associated with translation table walks.
-	 */
-	if ((flags & XLAT_TABLE_NC) != 0U) {
-		/* Inner & outer non-cacheable non-shareable. */
-		tcr |= TCR_SH_NON_SHAREABLE |
-			TCR_RGN_OUTER_NC | TCR_RGN_INNER_NC;
+	if (el == 3) {
+		return UPPER_ATTRS(XN);
 	} else {
-		/* Inner & outer WBWA & shareable. */
-		tcr |= TCR_SH_INNER_SHAREABLE |
-			TCR_RGN_OUTER_WBA | TCR_RGN_INNER_WBA;
+		assert(el == 1);
+		return UPPER_ATTRS(PXN);
 	}
+}
+
+void init_xlat_tables_arch(uint64_t max_pa)
+{
+	assert((PLAT_PHY_ADDR_SPACE_SIZE - 1U) <=
+	       xlat_arch_get_max_supported_pa());
 
 	/*
-	 * It is safer to restrict the max physical address accessible by the
-	 * hardware as much as possible.
+	 * If dynamic allocation of new regions is enabled the code can't make
+	 * assumptions about the max physical address because it could change
+	 * after adding new regions. If this functionality is disabled it is
+	 * safer to restrict the max physical address as much as possible.
 	 */
-	unsigned long long tcr_ps_bits = tcr_physical_addr_size_bits(max_pa);
+#ifdef PLAT_XLAT_TABLES_DYNAMIC
+	tcr_ps_bits = calc_physical_addr_size_bits(PLAT_PHY_ADDR_SPACE_SIZE);
+#else
+	tcr_ps_bits = calc_physical_addr_size_bits(max_pa);
+#endif
+}
 
-	if (xlat_regime == EL1_EL0_REGIME) {
-		/*
-		 * TCR_EL1.EPD1: Disable translation table walk for addresses
-		 * that are translated using TTBR1_EL1.
-		 */
-		tcr |= TCR_EPD1_BIT | (tcr_ps_bits << TCR_EL1_IPS_SHIFT);
-	} else if (xlat_regime == EL2_REGIME) {
-		tcr |= TCR_EL2_RES1 | (tcr_ps_bits << TCR_EL2_PS_SHIFT);
-	} else {
-		assert(xlat_regime == EL3_REGIME);
-		tcr |= TCR_EL3_RES1 | (tcr_ps_bits << TCR_EL3_PS_SHIFT);
+/*******************************************************************************
+ * Macro generating the code for the function enabling the MMU in the given
+ * exception level, assuming that the pagetables have already been created.
+ *
+ *   _el:		Exception level at which the function will run
+ *   _tcr_extra:	Extra bits to set in the TCR register. This mask will
+ *			be OR'ed with the default TCR value.
+ *   _tlbi_fct:		Function to invalidate the TLBs at the current
+ *			exception level
+ ******************************************************************************/
+#define DEFINE_ENABLE_MMU_EL(_el, _tcr_extra, _tlbi_fct)		\
+	static void enable_mmu_internal_el##_el(uint32_t flags,		\
+					 uint64_t *base_table)		\
+	{								\
+		uint64_t mair, tcr, ttbr;				\
+		uint32_t sctlr;						\
+									\
+		assert(IS_IN_EL(_el));					\
+		assert((read_sctlr_el##_el() & SCTLR_M_BIT) == 0U);	\
+									\
+		/* Invalidate TLBs at the current exception level */	\
+		_tlbi_fct();						\
+									\
+		/* Set attributes in the right indices of the MAIR */	\
+		mair = MAIR_ATTR_SET(ATTR_DEVICE, ATTR_DEVICE_INDEX);	\
+		mair |= MAIR_ATTR_SET(ATTR_IWBWA_OWBWA_NTR,		\
+				ATTR_IWBWA_OWBWA_NTR_INDEX);		\
+		mair |= MAIR_ATTR_SET(ATTR_NON_CACHEABLE,		\
+				ATTR_NON_CACHEABLE_INDEX);		\
+		write_mair_el##_el(mair);				\
+									\
+		/* Set TCR bits as well. */				\
+		/* Set T0SZ to (64 - width of virtual address space) */	\
+		if ((flags & XLAT_TABLE_NC) != 0U) {			\
+			/* Inner & outer non-cacheable non-shareable. */\
+			tcr = TCR_SH_NON_SHAREABLE |			\
+				TCR_RGN_OUTER_NC | TCR_RGN_INNER_NC |	\
+				(64U - __builtin_ctzl(PLAT_VIRT_ADDR_SPACE_SIZE));\
+		} else {						\
+			/* Inner & outer WBWA & shareable. */		\
+			tcr = TCR_SH_INNER_SHAREABLE |			\
+				TCR_RGN_OUTER_WBA | TCR_RGN_INNER_WBA |	\
+				(64U - __builtin_ctzl(PLAT_VIRT_ADDR_SPACE_SIZE));\
+		}							\
+		tcr |= _tcr_extra;					\
+		write_tcr_el##_el(tcr);					\
+									\
+		/* Set TTBR bits as well */				\
+		ttbr = (uint64_t) base_table;				\
+		write_ttbr0_el##_el(ttbr);				\
+									\
+		/* Ensure all translation table writes have drained */	\
+		/* into memory, the TLB invalidation is complete, */	\
+		/* and translation register writes are committed */	\
+		/* before enabling the MMU */				\
+		dsbish();						\
+		isb();							\
+									\
+		sctlr = (uint32_t)read_sctlr_el##_el();				\
+		sctlr |= SCTLR_WXN_BIT | SCTLR_M_BIT;			\
+									\
+		if ((flags & DISABLE_DCACHE) != 0U) {			\
+			sctlr &= ~SCTLR_C_BIT;				\
+		} else {						\
+			sctlr |= SCTLR_C_BIT;				\
+		}							\
+									\
+		write_sctlr_el##_el(sctlr);				\
+									\
+		/* Ensure the MMU enable takes effect immediately */	\
+		isb();							\
 	}
 
-	/* Set TTBR bits as well */
-	ttbr0 = (uint64_t) base_table;
+/* Define EL1 and EL3 variants of the function enabling the MMU */
+#if IMAGE_EL == 1
+DEFINE_ENABLE_MMU_EL(1,
+		(tcr_ps_bits << TCR_EL1_IPS_SHIFT),
+		tlbivmalle1)
+#elif IMAGE_EL == 3
+DEFINE_ENABLE_MMU_EL(3,
+		TCR_EL3_RES1 | (tcr_ps_bits << TCR_EL3_PS_SHIFT),
+		tlbialle3)
+#endif
 
-	if (is_armv8_2_ttcnp_present()) {
-		/* Enable CnP bit so as to share page tables with all PEs. */
-		ttbr0 |= TTBR_CNP_BIT;
-	}
-
-	params[MMU_CFG_MAIR] = mair;
-	params[MMU_CFG_TCR] = tcr;
-	params[MMU_CFG_TTBR0] = ttbr0;
+void enable_mmu_arch(uint32_t flags, uint64_t *base_table)
+{
+#if IMAGE_EL == 1
+	assert(IS_IN_EL(1));
+	enable_mmu_internal_el1(flags, base_table);
+#elif IMAGE_EL == 3
+	assert(IS_IN_EL(3));
+	enable_mmu_internal_el3(flags, base_table);
+#endif
 }

@@ -5,9 +5,8 @@
  */
 
 #include <arch.h>
-#include <lib/mmio.h>
-
 #include <mcucfg.h>
+#include <mmio.h>
 
 void disable_scu(unsigned long mpidr)
 {

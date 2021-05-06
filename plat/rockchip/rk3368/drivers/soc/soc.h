@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SOC_H
-#define SOC_H
+#ifndef __SOC_H__
+#define __SOC_H__
 
 enum plls_id {
 	ABPLL_ID = 0,
@@ -50,7 +50,7 @@ enum plls_id {
 #define PMUSRAM_S		1
 #define STIMER_S_SHIFT		6
 #define STIMER_S		1
-#define SGRF_SOC_CON7_BITS	((0xffffu << 16) | \
+#define SGRF_SOC_CON7_BITS	((0xffff << 16) | \
 				 (PMUSRAM_S << PMUSRAM_S_SHIFT) | \
 				 (STIMER_S << STIMER_S_SHIFT))
 
@@ -138,4 +138,4 @@ void regs_updata_bits(uintptr_t addr, uint32_t val,
 void soc_sleep_config(void);
 void pm_plls_resume(void);
 
-#endif /* SOC_H */
+#endif /* __SOC_H__ */

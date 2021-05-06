@@ -1,12 +1,15 @@
-/*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+﻿/*
+ * Copyright (c) 2017-2018, NVIDIA CORPORATION.  All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
  */
 
-#ifndef SECURITY_ENGINE_H
-#define SECURITY_ENGINE_H
+#ifndef __SECURITY_ENGINE_H__
+#define __SECURITY_ENGINE_H__
 
 /*******************************************************************************
  * Structure definition
@@ -57,4 +60,4 @@ void tegra_se_resume(void);
 int tegra_se_save_tzram(void);
 int32_t tegra_se_save_sha256_hash(uint64_t bl31_base, uint32_t src_len_inbyte);
 
-#endif /* SECURITY_ENGINE_H */
+#endif /* __SECURITY_ENGINE_H__ */

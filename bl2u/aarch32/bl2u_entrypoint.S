@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <common/bl_common.h>
+#include <bl_common.h>
+
 
 	.globl	bl2u_vector_table
 	.globl	bl2u_entrypoint
@@ -31,7 +32,7 @@ func bl2u_entrypoint
 	 * ---------------------------------------------
 	 */
 	mov	r11, r1
-	mov	r10, r2
+	mov	r12, r2
 
 	/* ---------------------------------------------
 	 * Set the exception vector to something sane.
@@ -41,13 +42,12 @@ func bl2u_entrypoint
 	stcopr	r0, VBAR
 	isb
 
-	/* --------------------------------------------------------
-	 * Enable the instruction cache - disable speculative loads
-	 * --------------------------------------------------------
+	/* -----------------------------------------------------
+	 * Enable the instruction cache
+	 * -----------------------------------------------------
 	 */
 	ldcopr	r0, SCTLR
 	orr	r0, r0, #SCTLR_I_BIT
-	bic	r0, r0, #SCTLR_DSSBS_BIT
 	stcopr	r0, SCTLR
 	isb
 
@@ -79,8 +79,7 @@ func bl2u_entrypoint
 	 * ---------------------------------------------
 	 */
 	ldr	r0, =__BSS_START__
-	ldr	r1, =__BSS_END__
-	sub 	r1, r1, r0
+	ldr	r1, =__BSS_SIZE__
 	bl	zeromem
 
 	/* --------------------------------------------
@@ -108,7 +107,7 @@ func bl2u_entrypoint
 	 * ---------------------------------------------
 	 */
 	mov	r0, r11
-	mov	r1, r10
+	mov	r1, r12
 	bl	bl2u_early_platform_setup
 	bl	bl2u_plat_arch_setup
 

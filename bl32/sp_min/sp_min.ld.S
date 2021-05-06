@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2016-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <common/bl_common.ld.h>
-#include <lib/xlat_tables/xlat_tables_defs.h>
+#include <platform_def.h>
+#include <xlat_tables_defs.h>
 
 OUTPUT_FORMAT(elf32-littlearm)
 OUTPUT_ARCH(arm)
@@ -15,21 +15,18 @@ MEMORY {
     RAM (rwx): ORIGIN = BL32_BASE, LENGTH = BL32_LIMIT - BL32_BASE
 }
 
-#ifdef PLAT_SP_MIN_EXTRA_LD_SCRIPT
-#include <plat_sp_min.ld.S>
-#endif
 
 SECTIONS
 {
     . = BL32_BASE;
-    ASSERT(. == ALIGN(PAGE_SIZE),
-           "BL32_BASE address is not aligned on a page boundary.")
+   ASSERT(. == ALIGN(PAGE_SIZE),
+          "BL32_BASE address is not aligned on a page boundary.")
 
 #if SEPARATE_CODE_AND_RODATA
     .text . : {
         __TEXT_START__ = .;
         *entrypoint.o(.text*)
-        *(SORT_BY_ALIGNMENT(.text*))
+        *(.text*)
         *(.vectors)
         . = ALIGN(PAGE_SIZE);
         __TEXT_END__ = .;
@@ -46,13 +43,22 @@ SECTIONS
 
     .rodata . : {
         __RODATA_START__ = .;
-        *(SORT_BY_ALIGNMENT(.rodata*))
+        *(.rodata*)
 
-	RODATA_COMMON
+        /* Ensure 4-byte alignment for descriptors and ensure inclusion */
+        . = ALIGN(4);
+        __RT_SVC_DESCS_START__ = .;
+        KEEP(*(rt_svc_descs))
+        __RT_SVC_DESCS_END__ = .;
 
-        /* Place pubsub sections for events */
-        . = ALIGN(8);
-#include <lib/el3_runtime/pubsub_events.h>
+        /*
+         * Ensure 4-byte alignment for cpu_ops so that its fields are also
+         * aligned. Also ensure cpu_ops inclusion.
+         */
+        . = ALIGN(4);
+        __CPU_OPS_START__ = .;
+        KEEP(*(cpu_ops))
+        __CPU_OPS_END__ = .;
 
         . = ALIGN(PAGE_SIZE);
         __RODATA_END__ = .;
@@ -61,14 +67,23 @@ SECTIONS
     ro . : {
         __RO_START__ = .;
         *entrypoint.o(.text*)
-        *(SORT_BY_ALIGNMENT(.text*))
-        *(SORT_BY_ALIGNMENT(.rodata*))
+        *(.text*)
+        *(.rodata*)
 
-	RODATA_COMMON
+        /* Ensure 4-byte alignment for descriptors and ensure inclusion */
+        . = ALIGN(4);
+        __RT_SVC_DESCS_START__ = .;
+        KEEP(*(rt_svc_descs))
+        __RT_SVC_DESCS_END__ = .;
 
-        /* Place pubsub sections for events */
-        . = ALIGN(8);
-#include <lib/el3_runtime/pubsub_events.h>
+        /*
+         * Ensure 4-byte alignment for cpu_ops so that its fields are also
+         * aligned. Also ensure cpu_ops inclusion.
+         */
+        . = ALIGN(4);
+        __CPU_OPS_START__ = .;
+        KEEP(*(cpu_ops))
+        __CPU_OPS_END__ = .;
 
         *(.vectors)
         __RO_END_UNALIGNED__ = .;
@@ -76,12 +91,18 @@ SECTIONS
         /*
          * Memory page(s) mapped to this section will be marked as
          * read-only, executable.  No RW data from the next section must
-         * creep in.  Ensure the rest of the current memory page is unused.
+         * creep in.  Ensure the rest of the current memory block is unused.
          */
         . = ALIGN(PAGE_SIZE);
         __RO_END__ = .;
     } >RAM
 #endif
+
+    /*
+     * Define a linker symbol for the runtime service descriptor
+     * memory region size.
+     */
+    __RT_SVC_DESCS_SIZE__ = __RT_SVC_DESCS_END__ - __RT_SVC_DESCS_START__;
 
     ASSERT(__CPU_OPS_END__ > __CPU_OPS_START__,
            "cpu_ops not defined for this platform.")
@@ -91,16 +112,78 @@ SECTIONS
      */
     __RW_START__ = . ;
 
-    DATA_SECTION >RAM
-    RELA_SECTION >RAM
+    .data . : {
+        __DATA_START__ = .;
+        *(.data*)
+        __DATA_END__ = .;
+    } >RAM
 
-#ifdef BL32_PROGBITS_LIMIT
-    ASSERT(. <= BL32_PROGBITS_LIMIT, "BL32 progbits has exceeded its limit.")
+    stacks (NOLOAD) : {
+        __STACKS_START__ = .;
+        *(tzfw_normal_stacks)
+        __STACKS_END__ = .;
+    } >RAM
+
+    /*
+     * The .bss section gets initialised to 0 at runtime.
+     * Its base address should be 8-byte aligned for better performance of the
+     * zero-initialization code.
+     */
+    .bss (NOLOAD) : ALIGN(8) {
+        __BSS_START__ = .;
+        *(.bss*)
+        *(COMMON)
+#if !USE_COHERENT_MEM
+        /*
+         * Bakery locks are stored in normal .bss memory
+         *
+         * Each lock's data is spread across multiple cache lines, one per CPU,
+         * but multiple locks can share the same cache line.
+         * The compiler will allocate enough memory for one CPU's bakery locks,
+         * the remaining cache lines are allocated by the linker script
+         */
+        . = ALIGN(CACHE_WRITEBACK_GRANULE);
+        __BAKERY_LOCK_START__ = .;
+        *(bakery_lock)
+        . = ALIGN(CACHE_WRITEBACK_GRANULE);
+        __PERCPU_BAKERY_LOCK_SIZE__ = ABSOLUTE(. - __BAKERY_LOCK_START__);
+        . = . + (__PERCPU_BAKERY_LOCK_SIZE__ * (PLATFORM_CORE_COUNT - 1));
+        __BAKERY_LOCK_END__ = .;
+#ifdef PLAT_PERCPU_BAKERY_LOCK_SIZE
+    ASSERT(__PERCPU_BAKERY_LOCK_SIZE__ == PLAT_PERCPU_BAKERY_LOCK_SIZE,
+        "PLAT_PERCPU_BAKERY_LOCK_SIZE does not match bakery lock requirements");
+#endif
 #endif
 
-    STACK_SECTION >RAM
-    BSS_SECTION >RAM
-    XLAT_TABLE_SECTION >RAM
+#if ENABLE_PMF
+        /*
+         * Time-stamps are stored in normal .bss memory
+         *
+         * The compiler will allocate enough memory for one CPU's time-stamps,
+         * the remaining memory for other CPU's is allocated by the
+         * linker script
+         */
+        . = ALIGN(CACHE_WRITEBACK_GRANULE);
+        __PMF_TIMESTAMP_START__ = .;
+        KEEP(*(pmf_timestamp_array))
+        . = ALIGN(CACHE_WRITEBACK_GRANULE);
+        __PMF_PERCPU_TIMESTAMP_END__ = .;
+        __PERCPU_TIMESTAMP_SIZE__ = ABSOLUTE(. - __PMF_TIMESTAMP_START__);
+        . = . + (__PERCPU_TIMESTAMP_SIZE__ * (PLATFORM_CORE_COUNT - 1));
+        __PMF_TIMESTAMP_END__ = .;
+#endif /* ENABLE_PMF */
+
+        __BSS_END__ = .;
+    } >RAM
+
+    /*
+     * The xlat_table section is for full, aligned page tables (4K).
+     * Removing them from .bss avoids forcing 4K alignment on
+     * the .bss section and eliminates the unecessary zero init
+     */
+    xlat_table (NOLOAD) : {
+        *(xlat_table)
+    } >RAM
 
      __BSS_SIZE__ = SIZEOF(.bss);
 
@@ -135,16 +218,10 @@ SECTIONS
 #endif
 
     /*
-     * Define a linker symbol to mark the end of the RW memory area for this
+     * Define a linker symbol to mark end of the RW memory area for this
      * image.
      */
     __RW_END__ = .;
 
-    __BL32_END__ = .;
-
-    /DISCARD/ : {
-        *(.dynsym .dynstr .hash .gnu.hash)
-    }
-
-    ASSERT(. <= BL32_LIMIT, "BL32 image has exceeded its limit.")
+   __BL32_END__ = .;
 }

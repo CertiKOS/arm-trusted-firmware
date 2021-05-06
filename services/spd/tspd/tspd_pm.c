@@ -4,22 +4,20 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
-#include <bl32/tsp/tsp.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <plat/common/platform.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <platform.h>
+#include <tsp.h>
 #include "tspd_private.h"
 
 /*******************************************************************************
  * The target cpu is being turned on. Allow the TSPD/TSP to perform any actions
  * needed. Nothing at the moment.
  ******************************************************************************/
-static void tspd_cpu_on_handler(u_register_t target_cpu)
+static void tspd_cpu_on_handler(uint64_t target_cpu)
 {
 }
 
@@ -27,7 +25,7 @@ static void tspd_cpu_on_handler(u_register_t target_cpu)
  * This cpu is being turned off. Allow the TSPD/TSP to perform any actions
  * needed
  ******************************************************************************/
-static int32_t tspd_cpu_off_handler(u_register_t unused)
+static int32_t tspd_cpu_off_handler(uint64_t unused)
 {
 	int32_t rc = 0;
 	uint32_t linear_id = plat_my_core_pos();
@@ -66,7 +64,7 @@ static int32_t tspd_cpu_off_handler(u_register_t unused)
  * This cpu is being suspended. S-EL1 state must have been saved in the
  * resident cpu (mpidr format) if it is a UP/UP migratable TSP.
  ******************************************************************************/
-static void tspd_cpu_suspend_handler(u_register_t max_off_pwrlvl)
+static void tspd_cpu_suspend_handler(uint64_t max_off_pwrlvl)
 {
 	int32_t rc = 0;
 	uint32_t linear_id = plat_my_core_pos();
@@ -102,7 +100,7 @@ static void tspd_cpu_suspend_handler(u_register_t max_off_pwrlvl)
  * after initialising minimal architectural state that guarantees safe
  * execution.
  ******************************************************************************/
-static void tspd_cpu_on_finish_handler(u_register_t unused)
+static void tspd_cpu_on_finish_handler(uint64_t unused)
 {
 	int32_t rc = 0;
 	uint32_t linear_id = plat_my_core_pos();
@@ -147,7 +145,7 @@ static void tspd_cpu_on_finish_handler(u_register_t unused)
  * completed the preceding suspend call. Use that context to program an entry
  * into the TSP to allow it to do any remaining book keeping
  ******************************************************************************/
-static void tspd_cpu_suspend_finish_handler(u_register_t max_off_pwrlvl)
+static void tspd_cpu_suspend_finish_handler(uint64_t max_off_pwrlvl)
 {
 	int32_t rc = 0;
 	uint32_t linear_id = plat_my_core_pos();
@@ -178,7 +176,7 @@ static void tspd_cpu_suspend_finish_handler(u_register_t max_off_pwrlvl)
  * Return the type of TSP the TSPD is dealing with. Report the current resident
  * cpu (mpidr format) if it is a UP/UP migratable TSP.
  ******************************************************************************/
-static int32_t tspd_cpu_migrate_info(u_register_t *resident_cpu)
+static int32_t tspd_cpu_migrate_info(uint64_t *resident_cpu)
 {
 	return TSP_MIGRATE_INFO;
 }

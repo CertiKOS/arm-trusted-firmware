@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef HISI_PWRC_H
-#define HISI_PWRC_H
+#ifndef __HISI_PWRC_H__
+#define __HISI_PWRC_H__
 
 #include <hi3660.h>
 #include <hi3660_crg.h>
@@ -39,7 +39,7 @@ void hisi_clear_cpu_boot_flag(unsigned int cluster, unsigned int core);
 int cluster_is_powered_on(unsigned int cluster);
 void hisi_enter_core_idle(unsigned int cluster, unsigned int core);
 void hisi_enter_cluster_idle(unsigned int cluster, unsigned int core);
-int hisi_test_ap_suspend_flag(void);
+int hisi_test_ap_suspend_flag(unsigned int cluster);
 void hisi_enter_ap_suspend(unsigned int cluster, unsigned int core);
 
 
@@ -54,4 +54,4 @@ void hisi_powerup_cluster(unsigned int cluster, unsigned int core);
 void hisi_powerdn_cluster(unsigned int cluster, unsigned int core);
 unsigned int hisi_test_cpu_down(unsigned int cluster, unsigned int core);
 
-#endif /* HISI_PWRC_H */
+#endif /* __HISI_PWRC_H__ */

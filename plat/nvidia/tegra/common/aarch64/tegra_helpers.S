@@ -1,16 +1,14 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include <arch.h>
 #include <asm_macros.S>
 #include <assert_macros.S>
-#include <cortex_a57.h>
 #include <cpu_macros.S>
-
+#include <cortex_a57.h>
+#include <cortex_a53.h>
 #include <platform_def.h>
 #include <tegra_def.h>
 #include <tegra_platform.h>
@@ -25,11 +23,14 @@
 #define ACTLR_ELx_L2CTLR_BIT		(U(1) << 4)
 #define ACTLR_ELx_CPUECTLR_BIT		(U(1) << 1)
 #define ACTLR_ELx_CPUACTLR_BIT		(U(1) << 0)
+#define ACTLR_ELx_ENABLE_ALL_MASK	(ACTLR_ELx_L2ACTLR_BIT | \
+					 ACTLR_ELx_L2ECTLR_BIT | \
+					 ACTLR_ELx_L2CTLR_BIT | \
+					 ACTLR_ELx_CPUECTLR_BIT)
 #define ACTLR_ELx_ENABLE_ALL_ACCESS	(ACTLR_ELx_L2ACTLR_BIT | \
 					 ACTLR_ELx_L2ECTLR_BIT | \
 					 ACTLR_ELx_L2CTLR_BIT | \
-					 ACTLR_ELx_CPUECTLR_BIT | \
-					 ACTLR_ELx_CPUACTLR_BIT)
+					 ACTLR_ELx_CPUECTLR_BIT)
 
 	/* Global functions */
 	.globl	plat_is_my_cpu_primary
@@ -39,14 +40,13 @@
 	.globl	platform_mem_init
 	.globl	plat_crash_console_init
 	.globl	plat_crash_console_putc
-	.globl	plat_crash_console_flush
-	.weak	plat_core_pos_by_mpidr
 	.globl	tegra_secure_entrypoint
 	.globl	plat_reset_handler
+	.globl	tegra_zeromem16
+	.globl	tegra_memcpy16
 
 	/* Global variables */
 	.globl	tegra_sec_entry_point
-	.globl	ns_image_entrypoint
 	.globl	tegra_bl31_phys_base
 	.globl	tegra_console_base
 
@@ -91,10 +91,14 @@
 	 * -------------------------------------------------------
 	 */
 	mrs	x0, actlr_el3
+	mov	x1, #ACTLR_ELx_ENABLE_ALL_MASK
+	bic	x0, x0, x1
 	mov	x1, #ACTLR_ELx_ENABLE_ALL_ACCESS
 	orr	x0, x0, x1
 	msr	actlr_el3, x0
 	mrs	x0, actlr_el2
+	mov	x1, #ACTLR_ELx_ENABLE_ALL_MASK
+	bic	x0, x0, x1
 	mov	x1, #ACTLR_ELx_ENABLE_ALL_ACCESS
 	orr	x0, x0, x1
 	msr	actlr_el2, x0
@@ -168,6 +172,23 @@ func plat_get_my_entrypoint
 endfunc plat_get_my_entrypoint
 
 	/* -----------------------------------------------------
+	 * int platform_get_core_pos(int mpidr);
+	 *
+	 * result: CorePos = (ClusterId * cpus per cluster) +
+	 *                   CoreId
+	 * -----------------------------------------------------
+	 */
+func platform_get_core_pos
+	and	x1, x0, #MPIDR_CPU_MASK
+	and	x0, x0, #MPIDR_CLUSTER_MASK
+	lsr	x0, x0, #MPIDR_AFFINITY_BITS
+	mov	x2, #PLATFORM_MAX_CPUS_PER_CLUSTER
+	mul	x0, x0, x2
+	add	x0, x1, x0
+	ret
+endfunc platform_get_core_pos
+
+	/* -----------------------------------------------------
 	 * void plat_secondary_cold_boot_setup (void);
 	 *
 	 * This function performs any platform specific actions
@@ -192,6 +213,35 @@ func platform_mem_init
 	ret
 endfunc platform_mem_init
 
+	/* ---------------------------------------------
+	 * int plat_crash_console_init(void)
+	 * Function to initialize the crash console
+	 * without a C Runtime to print crash report.
+	 * Clobber list : x0 - x4
+	 * ---------------------------------------------
+	 */
+func plat_crash_console_init
+	mov	x0, #0
+	adr	x1, tegra_console_base
+	ldr	x1, [x1]
+	cbz	x1, 1f
+	mov	w0, #1
+1:	ret
+endfunc plat_crash_console_init
+
+	/* ---------------------------------------------
+	 * int plat_crash_console_putc(void)
+	 * Function to print a character on the crash
+	 * console without a C Runtime.
+	 * Clobber list : x1, x2
+	 * ---------------------------------------------
+	 */
+func plat_crash_console_putc
+	adr	x1, tegra_console_base
+	ldr	x1, [x1]
+	b	console_core_putc
+endfunc plat_crash_console_putc
+
 	/* ---------------------------------------------------
 	 * Function to handle a platform reset and store
 	 * input parameters passed by BL2.
@@ -215,8 +265,7 @@ func plat_reset_handler
 	 */
 	mov	x0, x17
 	mov	x1, x18
-	adr	x2, __RELA_END__
-	sub	x2, x2, x18
+	mov	x2, #BL31_SIZE
 _loop16:
 	cmp	x2, #16
 	b.lo	_loop1
@@ -256,47 +305,12 @@ _end:	mov	x0, x20
 	ret
 endfunc plat_reset_handler
 
-	/* ------------------------------------------------------
-	 * int32_t plat_core_pos_by_mpidr(u_register_t mpidr)
-	 *
-	 * This function implements a part of the critical
-	 * interface between the psci generic layer and the
-	 * platform that allows the former to query the platform
-	 * to convert an MPIDR to a unique linear index. An error
-	 * code (-1) is returned in case the MPIDR is invalid.
-	 *
-	 * Clobbers: x0-x3
-	 * ------------------------------------------------------
-	 */
-func plat_core_pos_by_mpidr
-	lsr	x1, x0, #MPIDR_AFF0_SHIFT
-	and	x1, x1, #MPIDR_AFFLVL_MASK /* core id */
-	lsr	x2, x0, #MPIDR_AFF1_SHIFT
-	and	x2, x2, #MPIDR_AFFLVL_MASK /* cluster id */
-
-	/* core_id >= PLATFORM_MAX_CPUS_PER_CLUSTER */
-	mov	x0, #-1
-	cmp	x1, #(PLATFORM_MAX_CPUS_PER_CLUSTER - 1)
-	b.gt	1f
-
-	/* cluster_id >= PLATFORM_CLUSTER_COUNT */
-	cmp	x2, #(PLATFORM_CLUSTER_COUNT - 1)
-	b.gt	1f
-
-	/* CorePos = CoreId + (ClusterId * cpus per cluster) */
-	mov	x3, #PLATFORM_MAX_CPUS_PER_CLUSTER
-	mul	x3, x3, x2
-	add	x0, x1, x3
-
-1:
-	ret
-endfunc plat_core_pos_by_mpidr
-
 	/* ----------------------------------------
 	 * Secure entrypoint function for CPU boot
 	 * ----------------------------------------
 	 */
-func tegra_secure_entrypoint _align=6
+	.align 6
+func tegra_secure_entrypoint
 
 #if ERRATA_TEGRA_INVALIDATE_BTB_AT_BOOT
 
@@ -322,18 +336,18 @@ func tegra_secure_entrypoint _align=6
 	 * entries from the branch predictor array.
 	 * -------------------------------------------------------
 	 */
-	mrs	x0, CORTEX_A57_CPUACTLR_EL1
+	mrs	x0, CORTEX_A57_ACTLR_EL1
 	orr	x0, x0, #1
-	msr	CORTEX_A57_CPUACTLR_EL1, x0	/* invalidate BTB and I$ together */
+	msr	CORTEX_A57_ACTLR_EL1, x0	/* invalidate BTB and I$ together */
 	dsb	sy
 	isb
 	ic	iallu			/* actual invalidate */
 	dsb	sy
 	isb
 
-	mrs	x0, CORTEX_A57_CPUACTLR_EL1
+	mrs	x0, CORTEX_A57_ACTLR_EL1
 	bic	x0, x0, #1
-	msr	CORTEX_A57_CPUACTLR_EL1, X0	/* restore original CPUACTLR_EL1 */
+	msr	CORTEX_A57_ACTLR_EL1, X0	/* restore original CPUACTLR_EL1 */
 	dsb	sy
 	isb
 
@@ -357,7 +371,7 @@ func tegra_secure_entrypoint _align=6
 	msr	oslar_el1, x0		/* os lock stays 0 across warm reset */
 	mov	x3, #3
 	movz	x4, #0x8000, lsl #48
-	msr	CORTEX_A57_CPUACTLR_EL1, x4	/* turn off RCG */
+	msr	CORTEX_A57_ACTLR_EL1, x4	/* turn off RCG */
 	isb
 	msr	rmr_el3, x3		/* request warm reset */
 	isb
@@ -396,6 +410,26 @@ restore_oslock:
 	br	x0
 endfunc tegra_secure_entrypoint
 
+	/* --------------------------------------------------
+	 * Handler to implement zeromem functionality
+	 * --------------------------------------------------
+	 */
+func tegra_zeromem16
+	mov	x29, x30
+	bl	zeromem16
+	ret	x29
+endfunc tegra_zeromem16
+
+	/* --------------------------------------------------
+	 * Handler to implement memcpy functionality
+	 * --------------------------------------------------
+	 */
+func tegra_memcpy16
+	mov	x29, x30
+	bl	memcpy16
+	ret	x29
+endfunc tegra_memcpy16
+
 	.data
 	.align 3
 
@@ -404,13 +438,6 @@ endfunc tegra_secure_entrypoint
 	 * --------------------------------------------------
 	 */
 tegra_sec_entry_point:
-	.quad	0
-
-	/* --------------------------------------------------
-	 * NS world's cold boot entry point
-	 * --------------------------------------------------
-	 */
-ns_image_entrypoint:
 	.quad	0
 
 	/* --------------------------------------------------

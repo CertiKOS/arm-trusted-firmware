@@ -1,79 +1,47 @@
 /*
- * Copyright (c) 2014-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
-#include <stdint.h>
-
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/el3_runtime/cpu_data.h>
-#include <lib/pmf/pmf.h>
-#include <lib/psci/psci.h>
-#include <lib/runtime_instr.h>
-#include <services/sdei.h>
-#include <services/spm_mm_svc.h>
-#include <services/spmd_svc.h>
-#include <services/std_svc.h>
-#include <services/trng_svc.h>
+#include <context_mgmt.h>
+#include <cpu_data.h>
+#include <debug.h>
+#include <pmf.h>
+#include <psci.h>
+#include <runtime_instr.h>
+#include <runtime_svc.h>
 #include <smccc_helpers.h>
-#include <tools_share/uuid.h>
+#include <std_svc.h>
+#include <stdint.h>
+#include <uuid.h>
 
 /* Standard Service UUID */
-static uuid_t arm_svc_uid = {
-	{0x5b, 0x90, 0x8d, 0x10},
-	{0x63, 0xf8},
-	{0xe8, 0x47},
-	0xae, 0x2d,
-	{0xc0, 0xfb, 0x56, 0x41, 0xf6, 0xe2}
-};
+DEFINE_SVC_UUID((arm_svc_uid),
+		(0x108d905b), (0xf863), (0x47e8), (0xae), (0x2d),
+		(0xc0), (0xfb), (0x56), (0x41), (0xf6), (0xe2));
 
 /* Setup Standard Services */
 static int32_t std_svc_setup(void)
 {
 	uintptr_t svc_arg;
-	int ret = 0;
 
 	svc_arg = get_arm_std_svc_args(PSCI_FID_MASK);
-	assert(svc_arg);
+	assert(svc_arg != 0U);
 
 	/*
-	 * PSCI is one of the specifications implemented as a Standard Service.
+	 * PSCI is the only specification implemented as a Standard Service.
 	 * The `psci_setup()` also does EL3 architectural setup.
 	 */
-	if (psci_setup((const psci_lib_args_t *)svc_arg) != PSCI_E_SUCCESS) {
-		ret = 1;
-	}
-
-#if SPM_MM
-	if (spm_mm_setup() != 0) {
-		ret = 1;
-	}
-#endif
-
-#if defined(SPD_spmd)
-	if (spmd_setup() != 0) {
-		ret = 1;
-	}
-#endif
-
-#if SDEI_SUPPORT
-	/* SDEI initialisation */
-	sdei_init();
-#endif
-
-	trng_setup();
-
-	return ret;
+	return psci_setup((const psci_lib_args_t *)svc_arg);
 }
 
 /*
  * Top-level Standard Service SMC handler. This handler will in turn dispatch
  * calls to PSCI SMC handler
  */
-static uintptr_t std_svc_smc_handler(uint32_t smc_fid,
+uintptr_t std_svc_smc_handler(uint32_t smc_fid,
 			     u_register_t x1,
 			     u_register_t x2,
 			     u_register_t x3,
@@ -113,71 +81,42 @@ static uintptr_t std_svc_smc_handler(uint32_t smc_fid,
 		SMC_RET1(handle, ret);
 	}
 
-#if SPM_MM
-	/*
-	 * Dispatch SPM calls to SPM SMC handler and return its return
-	 * value
-	 */
-	if (is_spm_mm_fid(smc_fid)) {
-		return spm_mm_smc_handler(smc_fid, x1, x2, x3, x4, cookie,
-					  handle, flags);
-	}
-#endif
-
-#if defined(SPD_spmd)
-	/*
-	 * Dispatch FFA calls to the FFA SMC handler implemented by the SPM
-	 * dispatcher and return its return value
-	 */
-	if (is_ffa_fid(smc_fid)) {
-		return spmd_smc_handler(smc_fid, x1, x2, x3, x4, cookie,
-					handle, flags);
-	}
-#endif
-
-#if SDEI_SUPPORT
-	if (is_sdei_fid(smc_fid)) {
-		return sdei_smc_handler(smc_fid, x1, x2, x3, x4, cookie, handle,
-				flags);
-	}
-#endif
-
-#if TRNG_SUPPORT
-	if (is_trng_fid(smc_fid)) {
-		return trng_smc_handler(smc_fid, x1, x2, x3, x4, cookie, handle,
-				flags);
-	}
-#endif
-
 	switch (smc_fid) {
 	case ARM_STD_SVC_CALL_COUNT:
 		/*
 		 * Return the number of Standard Service Calls. PSCI is the only
 		 * standard service implemented; so return number of PSCI calls
 		 */
-		SMC_RET1(handle, PSCI_NUM_CALLS);
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (PSCI_NUM_CALLS));
+		break;
 
 	case ARM_STD_SVC_UID:
 		/* Return UID to the caller */
-		SMC_UUID_RET(handle, arm_svc_uid);
+		write_uuid_to_ctx((handle), (arm_svc_uid));
+		break;
 
 	case ARM_STD_SVC_VERSION:
 		/* Return the version of current implementation */
-		SMC_RET2(handle, STD_SVC_VERSION_MAJOR, STD_SVC_VERSION_MINOR);
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (STD_SVC_VERSION_MAJOR));
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X1), (STD_SVC_VERSION_MINOR));
+		break;
 
 	default:
 		WARN("Unimplemented Standard Service Call: 0x%x \n", smc_fid);
-		SMC_RET1(handle, SMC_UNK);
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), ((uint64_t)SMC_UNK));
+		break;
 	}
+
+	return 0;
 }
 
 /* Register Standard Service Calls as runtime service */
 DECLARE_RT_SVC(
 		std_svc,
 
-		OEN_STD_START,
-		OEN_STD_END,
-		SMC_TYPE_FAST,
-		std_svc_setup,
-		std_svc_smc_handler
+		(OEN_STD_START),
+		(OEN_STD_END),
+		((uint8_t)SMC_TYPE_FAST),
+		(std_svc_setup),
+		(std_svc_smc_handler)
 );

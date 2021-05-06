@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PLAT_MACROS_S
-#define PLAT_MACROS_S
+#ifndef __PLAT_MACROS_S__
+#define __PLAT_MACROS_S__
 
-#include <drivers/arm/cci.h>
-#include <drivers/arm/gicv2.h>
+#include <cci.h>
 #include <hi3660.h>
+#include <gic_v2.h>
 #include <platform_def.h>
 
 .section .rodata.gic_reg_name, "aS"
 gicc_regs:
 	.asciz "gicc_hppir", "gicc_ahppir", "gicc_ctlr", ""
 gicd_pend_reg:
-	.asciz "gicd_ispendr regs (Offsets 0x200 - 0x278)\n Offset:\t\t\tvalue\n"
+	.asciz "gicd_ispendr regs (Offsets 0x200 - 0x278)\n"    \
+                " Offset:\t\t\tvalue\n"
 newline:
 	.asciz "\n"
 spacer:
@@ -75,4 +76,4 @@ cci_iface_regs:
 	bl	str_in_crash_buf_print
 .endm
 
-#endif /* PLAT_MACROS_S */
+#endif /* __PLAT_MACROS_S__ */

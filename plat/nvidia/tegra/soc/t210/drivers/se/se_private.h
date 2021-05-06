@@ -1,12 +1,15 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2017-2020, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2019, NVIDIA CORPORATION.  All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
  */
 
-#ifndef SE_PRIVATE_H
-#define SE_PRIVATE_H
+#ifndef __SE_PRIVATE_H__
+#define __SE_PRIVATE_H__
 
 #include <stdbool.h>
 #include <security_engine.h>
@@ -161,6 +164,7 @@
 #define SE_RNG_CONFIG_MODE(x)   \
 		((x) & ((0x3U) << DRBG_MODE_SHIFT))
 
+#define RNG_RESEED_INTERVAL	0x00773594
 #define DRBG_SRC_SHIFT				2
 #define DRBG_SRC_NONE	   \
 		((0U) << DRBG_SRC_SHIFT)
@@ -559,18 +563,19 @@
  ******************************************************************************/
 
 /* SE context blob */
-#pragma pack(push, 1)
+#pragma pack(push,1)
 typedef struct tegra_aes_key_slot {
-	/* 0 - 7 AES key */
 	uint32_t key[8];
-	/* 8 - 11 Original IV */
-	uint32_t oiv[4];
-	/* 12 - 15 Updated IV */
-	uint32_t uiv[4];
 } tegra_se_aes_key_slot_t;
 #pragma pack(pop)
 
-#pragma pack(push, 1)
+#pragma pack(push,1)
+typedef struct tegra_aes_iv_slot {
+	uint32_t iv[4];
+} tegra_se_aes_iv_slot_t;
+#pragma pack(pop)
+
+#pragma pack(push,1)
 typedef struct tegra_se_context {
 	/* random number */
 	unsigned char rand_data[SE_CTX_SAVE_RANDOM_DATA_SIZE];
@@ -578,13 +583,17 @@ typedef struct tegra_se_context {
 	unsigned char sticky_bits[SE_CTX_SAVE_STICKY_BITS_SIZE * 2];
 	/* AES key slots */
 	tegra_se_aes_key_slot_t key_slots[TEGRA_SE_AES_KEYSLOT_COUNT];
+	/* AES original iv slots */
+	tegra_se_aes_iv_slot_t key_oiv[TEGRA_SE_AES_KEYSLOT_COUNT];
+	/* AES updated iv slots */
+	tegra_se_aes_iv_slot_t key_uiv[TEGRA_SE_AES_KEYSLOT_COUNT];
 	/* RSA key slots */
 	unsigned char rsa_keys[SE_CTX_SAVE_RSA_KEY_LENGTH];
 } tegra_se_context_t;
 #pragma pack(pop)
 
 /* PKA context blob */
-#pragma pack(push, 1)
+#pragma pack(push,1)
 typedef struct tegra_pka_context {
 	unsigned char sticky_bits[SE2_CONTEXT_SAVE_PKA1_STICKY_BITS_LENGTH];
 	unsigned char pka_keys[SE2_CONTEXT_SAVE_PKA1_KEYS_LENGTH];
@@ -592,7 +601,7 @@ typedef struct tegra_pka_context {
 #pragma pack(pop)
 
 /* SE context blob */
-#pragma pack(push, 1)
+#pragma pack(push,1)
 typedef struct tegra_se_context_blob {
 	/* SE context */
 	tegra_se_context_t se_ctx;
@@ -602,7 +611,7 @@ typedef struct tegra_se_context_blob {
 #pragma pack(pop)
 
 /* SE2 and PKA1 context blob */
-#pragma pack(push, 1)
+#pragma pack(push,1)
 typedef struct tegra_se2_context_blob {
 	/* SE2 context */
 	tegra_se_context_t se_ctx;
@@ -660,4 +669,4 @@ uint32_t val)
 int tegra_se_start_normal_operation(const tegra_se_dev_t *, uint32_t);
 int tegra_se_start_ctx_save_operation(const tegra_se_dev_t *, uint32_t);
 
-#endif /* SE_PRIVATE_H */
+#endif /* __SE_PRIVATE_H__ */

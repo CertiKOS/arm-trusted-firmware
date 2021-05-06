@@ -1,16 +1,15 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <io_driver.h>
+#include <io_storage.h>
+#include <platform_def.h>
 #include <stddef.h>
 
-#include <platform_def.h>
-
-#include <drivers/io/io_driver.h>
-#include <drivers/io/io_storage.h>
 
 /* Storage for a fixed maximum number of IO entities, definable by platform */
 static io_entity_t entity_pool[MAX_IO_HANDLES];
@@ -32,34 +31,36 @@ static unsigned int dev_count;
 #if ENABLE_ASSERTIONS
 
 /* Return a boolean value indicating whether a device connector is valid */
-static bool is_valid_dev_connector(const io_dev_connector_t *dev_con)
+static int is_valid_dev_connector(const io_dev_connector_t *dev_con)
 {
-	return (dev_con != NULL) && (dev_con->dev_open != NULL);
+	int result = (dev_con != NULL) && (dev_con->dev_open != NULL);
+	return result;
 }
 
+
 /* Return a boolean value indicating whether a device handle is valid */
-static bool is_valid_dev(const uintptr_t dev_handle)
+static int is_valid_dev(const uintptr_t dev_handle)
 {
 	const io_dev_info_t *dev = (io_dev_info_t *)dev_handle;
-
-	return (dev != NULL) && (dev->funcs != NULL) &&
+	int result = (dev != NULL) && (dev->funcs != NULL) &&
 			(dev->funcs->type != NULL) &&
 			(dev->funcs->type() < IO_TYPE_MAX);
+	return result;
 }
 
 
 /* Return a boolean value indicating whether an IO entity is valid */
-static bool is_valid_entity(const uintptr_t handle)
+static int is_valid_entity(const uintptr_t handle)
 {
 	const io_entity_t *entity = (io_entity_t *)handle;
-
-	return (entity != NULL) &&
+	int result = (entity != NULL) &&
 			(is_valid_dev((uintptr_t)entity->dev_handle));
+	return result;
 }
 
 
 /* Return a boolean value indicating whether a seek mode is valid */
-static bool is_valid_seek_mode(io_seek_mode_t mode)
+static int is_valid_seek_mode(io_seek_mode_t mode)
 {
 	return ((mode != IO_SEEK_INVALID) && (mode < IO_SEEK_MAX));
 }
@@ -69,14 +70,15 @@ static bool is_valid_seek_mode(io_seek_mode_t mode)
 
 
 /* Open a connection to a specific device */
-static int io_storage_dev_open(const io_dev_connector_t *dev_con,
-		const uintptr_t dev_spec,
+static int dev_open(const io_dev_connector_t *dev_con, const uintptr_t dev_spec,
 		io_dev_info_t **dev_info)
 {
+	int result;
 	assert(dev_info != NULL);
 	assert(is_valid_dev_connector(dev_con));
 
-	return dev_con->dev_open(dev_spec, dev_info);
+	result = dev_con->dev_open(dev_spec, dev_info);
+	return result;
 }
 
 
@@ -92,7 +94,7 @@ static void set_handle(uintptr_t *handle, io_entity_t *entity)
 static int find_first_entity(const io_entity_t *entity, unsigned int *index_out)
 {
 	int result = -ENOENT;
-	for (unsigned int index = 0; index < MAX_IO_HANDLES; ++index) {
+	for (int index = 0; index < MAX_IO_HANDLES; ++index) {
 		if (entity_map[index] == entity) {
 			result = 0;
 			*index_out = index;
@@ -113,8 +115,7 @@ static int allocate_entity(io_entity_t **entity)
 		unsigned int index = 0;
 		result = find_first_entity(NULL, &index);
 		assert(result == 0);
-		*entity = &entity_pool[index];
-		entity_map[index] = &entity_pool[index];
+		*entity = entity_map[index] = &entity_pool[index];
 		++entity_count;
 	}
 
@@ -161,8 +162,11 @@ int io_register_device(const io_dev_info_t *dev_info)
 int io_dev_open(const io_dev_connector_t *dev_con, const uintptr_t dev_spec,
 		uintptr_t *handle)
 {
+	int result;
 	assert(handle != NULL);
-	return io_storage_dev_open(dev_con, dev_spec, (io_dev_info_t **)handle);
+
+	result = dev_open(dev_con, dev_spec, (io_dev_info_t **)handle);
+	return result;
 }
 
 
@@ -183,6 +187,9 @@ int io_dev_init(uintptr_t dev_handle, const uintptr_t init_params)
 
 	return result;
 }
+
+
+/* TODO: Consider whether an explicit "shutdown" API should be included */
 
 /* Close a connection to a device */
 int io_dev_close(uintptr_t dev_handle)
@@ -232,7 +239,7 @@ int io_open(uintptr_t dev_handle, const uintptr_t spec, uintptr_t *handle)
 
 
 /* Seek to a specific position in an IO entity */
-int io_seek(uintptr_t handle, io_seek_mode_t mode, signed long long offset)
+int io_seek(uintptr_t handle, io_seek_mode_t mode, ssize_t offset)
 {
 	int result = -ENODEV;
 	assert(is_valid_entity(handle) && is_valid_seek_mode(mode));
@@ -272,7 +279,7 @@ int io_read(uintptr_t handle,
 		size_t *length_read)
 {
 	int result = -ENODEV;
-	assert(is_valid_entity(handle));
+	assert(is_valid_entity(handle) && (buffer != (uintptr_t)NULL));
 
 	io_entity_t *entity = (io_entity_t *)handle;
 
@@ -292,7 +299,7 @@ int io_write(uintptr_t handle,
 		size_t *length_written)
 {
 	int result = -ENODEV;
-	assert(is_valid_entity(handle));
+	assert(is_valid_entity(handle) && (buffer != (uintptr_t)NULL));
 
 	io_entity_t *entity = (io_entity_t *)handle;
 

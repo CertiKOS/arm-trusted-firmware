@@ -1,40 +1,34 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
-#include <stddef.h>
-
+#include <bl_common.h>
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
 #include <context.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/el3_runtime/cpu_data.h>
-#include <lib/el3_runtime/pubsub_events.h>
-#include <lib/pmf/pmf.h>
-#include <lib/runtime_instr.h>
-#include <plat/common/platform.h>
-
+#include <context_mgmt.h>
+#include <cpu_data.h>
+#include <debug.h>
+#include <platform.h>
+#include <pmf.h>
+#include <runtime_instr.h>
+#include <stddef.h>
 #include "psci_private.h"
 
 /*******************************************************************************
  * This function does generic and platform specific operations after a wake-up
  * from standby/retention states at multiple power levels.
  ******************************************************************************/
-static void psci_suspend_to_standby_finisher(unsigned int cpu_idx,
-					     unsigned int end_pwrlvl)
+static void psci_suspend_to_standby_finisher(uint32_t cpu_idx,
+					     uint32_t end_pwrlvl)
 {
-	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
 	psci_power_state_t state_info;
 
-	/* Get the parent nodes */
-	psci_get_parent_pwr_domain_nodes(cpu_idx, end_pwrlvl, parent_nodes);
-
-	psci_acquire_pwr_domain_locks(end_pwrlvl, parent_nodes);
+	psci_acquire_pwr_domain_locks(end_pwrlvl,
+				cpu_idx);
 
 	/*
 	 * Find out which retention states this CPU has exited from until the
@@ -42,11 +36,6 @@ static void psci_suspend_to_standby_finisher(unsigned int cpu_idx,
 	 * state as a result of state coordination amongst other CPUs post wfi.
 	 */
 	psci_get_target_local_pwr_states(end_pwrlvl, &state_info);
-
-#if ENABLE_PSCI_STAT
-	plat_psci_stat_accounting_stop(&state_info);
-	psci_stats_update_pwr_up(end_pwrlvl, &state_info);
-#endif
 
 	/*
 	 * Plat. management: Allow the platform to do operations
@@ -60,48 +49,28 @@ static void psci_suspend_to_standby_finisher(unsigned int cpu_idx,
 	 */
 	psci_set_pwr_domains_to_run(end_pwrlvl);
 
-	psci_release_pwr_domain_locks(end_pwrlvl, parent_nodes);
+	psci_release_pwr_domain_locks(end_pwrlvl,
+				cpu_idx);
 }
 
 /*******************************************************************************
  * This function does generic and platform specific suspend to power down
  * operations.
  ******************************************************************************/
-static void psci_suspend_to_pwrdown_start(unsigned int end_pwrlvl,
-					  const entry_point_info_t *ep,
-					  const psci_power_state_t *state_info)
+static void psci_suspend_to_pwrdown_start(uint32_t end_pwrlvl,
+					  entry_point_info_t *ep,
+					  psci_power_state_t *state_info)
 {
-	unsigned int max_off_lvl = psci_find_max_off_lvl(state_info);
-
-	PUBLISH_EVENT(psci_suspend_pwrdown_start);
+	uint32_t max_off_lvl = psci_find_max_off_lvl(state_info);
 
 	/* Save PSCI target power level for the suspend finisher handler */
-	psci_set_suspend_pwrlvl(end_pwrlvl);
+	psci_set_suspend_pwrlvl((uint8_t)end_pwrlvl);
 
 	/*
 	 * Flush the target power level as it might be accessed on power up with
 	 * Data cache disabled.
 	 */
 	psci_flush_cpu_data(psci_svc_cpu_data.target_pwrlvl);
-
-	/*
-	 * Call the cpu suspend handler registered by the Secure Payload
-	 * Dispatcher to let it do any book-keeping. If the handler encounters an
-	 * error, it's expected to assert within
-	 */
-	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_suspend != NULL))
-		psci_spd_pm->svc_suspend(max_off_lvl);
-
-#if !HW_ASSISTED_COHERENCY
-	/*
-	 * Plat. management: Allow the platform to perform any early
-	 * actions required to power down the CPU. This might be useful for
-	 * HW_ASSISTED_COHERENCY = 0 platforms that can safely perform these
-	 * actions with data caches enabled.
-	 */
-	if (psci_plat_pm_ops->pwr_domain_suspend_pwrdown_early != NULL)
-		psci_plat_pm_ops->pwr_domain_suspend_pwrdown_early(state_info);
-#endif
 
 	/*
 	 * Store the re-entry information for the non-secure world.
@@ -151,31 +120,29 @@ static void psci_suspend_to_pwrdown_start(unsigned int end_pwrlvl,
  * the state transition has been done, no further error is expected and it is
  * not possible to undo any of the actions taken beyond that point.
  ******************************************************************************/
-void psci_cpu_suspend_start(const entry_point_info_t *ep,
-			    unsigned int end_pwrlvl,
+void psci_cpu_suspend_start(entry_point_info_t *ep,
+			    uint32_t end_pwrlvl,
 			    psci_power_state_t *state_info,
-			    unsigned int is_power_down_state)
+			    uint32_t is_power_down_state)
 {
-	int skip_wfi = 0;
-	unsigned int idx = plat_my_core_pos();
-	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
+	int32_t skip_wfi = 0;
+	uint32_t index = plat_my_core_pos();
+	uint32_t max_off_lvl = psci_find_max_off_lvl(state_info);
 
 	/*
 	 * This function must only be called on platforms where the
 	 * CPU_SUSPEND platform hooks have been implemented.
 	 */
 	assert((psci_plat_pm_ops->pwr_domain_suspend != NULL) &&
-	       (psci_plat_pm_ops->pwr_domain_suspend_finish != NULL));
-
-	/* Get the parent nodes */
-	psci_get_parent_pwr_domain_nodes(idx, end_pwrlvl, parent_nodes);
+			(psci_plat_pm_ops->pwr_domain_suspend_finish != NULL));
 
 	/*
 	 * This function acquires the lock corresponding to each power
 	 * level so that by the time all locks are taken, the system topology
 	 * is snapshot and state management can be done safely.
 	 */
-	psci_acquire_pwr_domain_locks(end_pwrlvl, parent_nodes);
+	psci_acquire_pwr_domain_locks(end_pwrlvl,
+				      index);
 
 	/*
 	 * We check if there are any pending interrupts after the delay
@@ -199,8 +166,14 @@ void psci_cpu_suspend_start(const entry_point_info_t *ep,
 	psci_stats_update_pwr_down(end_pwrlvl, state_info);
 #endif
 
-	if (is_power_down_state != 0U)
-		psci_suspend_to_pwrdown_start(end_pwrlvl, ep, state_info);
+	/*
+	 * Call the cpu suspend handler registered by the Secure Payload
+	 * Dispatcher to let it do any book-keeping. If the handler encounters an
+	 * error, it's expected to assert within
+	 */
+	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_suspend != NULL)) {
+		psci_spd_pm->svc_suspend(max_off_lvl);
+	}
 
 	/*
 	 * Plat. management: Allow the platform to perform the
@@ -209,6 +182,10 @@ void psci_cpu_suspend_start(const entry_point_info_t *ep,
 	 * program the power controller etc.
 	 */
 	psci_plat_pm_ops->pwr_domain_suspend(state_info);
+
+	if (is_power_down_state != 0U) {
+		psci_suspend_to_pwrdown_start(end_pwrlvl, ep, state_info);
+	}
 
 #if ENABLE_PSCI_STAT
 	plat_psci_stat_accounting_start(state_info);
@@ -219,10 +196,11 @@ exit:
 	 * Release the locks corresponding to each power level in the
 	 * reverse order to which they were acquired.
 	 */
-	psci_release_pwr_domain_locks(end_pwrlvl, parent_nodes);
-
-	if (skip_wfi == 1)
+	psci_release_pwr_domain_locks(end_pwrlvl,
+				  index);
+	if (skip_wfi != 0) {
 		return;
+	}
 
 	if (is_power_down_state != 0U) {
 #if ENABLE_RUNTIME_INSTRUMENTATION
@@ -239,10 +217,11 @@ exit:
 #endif
 
 		/* The function calls below must not return */
-		if (psci_plat_pm_ops->pwr_domain_pwr_down_wfi != NULL)
+		if (psci_plat_pm_ops->pwr_domain_pwr_down_wfi != NULL) {
 			psci_plat_pm_ops->pwr_domain_pwr_down_wfi(state_info);
-		else
+		} else {
 			psci_power_down_wfi();
+		}
 	}
 
 #if ENABLE_RUNTIME_INSTRUMENTATION
@@ -251,12 +230,21 @@ exit:
 	    PMF_NO_CACHE_MAINT);
 #endif
 
+#if ENABLE_PSCI_STAT
+	plat_psci_stat_accounting_start(state_info);
+#endif
+
 	/*
 	 * We will reach here if only retention/standby states have been
 	 * requested at multiple power levels. This means that the cpu
 	 * context will be preserved.
 	 */
 	wfi();
+
+#if ENABLE_PSCI_STAT
+	plat_psci_stat_accounting_stop(state_info);
+	psci_stats_update_pwr_up(end_pwrlvl, state_info);
+#endif
 
 #if ENABLE_RUNTIME_INSTRUMENTATION
 	PMF_CAPTURE_TIMESTAMP(rt_instr_svc,
@@ -268,7 +256,7 @@ exit:
 	 * After we wake up from context retaining suspend, call the
 	 * context retaining suspend finisher.
 	 */
-	psci_suspend_to_standby_finisher(idx, end_pwrlvl);
+	psci_suspend_to_standby_finisher(index, end_pwrlvl);
 }
 
 /*******************************************************************************
@@ -276,15 +264,15 @@ exit:
  * are called by the common finisher routine in psci_common.c. The `state_info`
  * is the psci_power_state from which this CPU has woken up from.
  ******************************************************************************/
-void psci_cpu_suspend_finish(unsigned int cpu_idx, const psci_power_state_t *state_info)
+void psci_cpu_suspend_finish(uint32_t cpu_idx,
+			     psci_power_state_t *state_info)
 {
-	unsigned int counter_freq;
-	unsigned int max_off_lvl;
+	uint32_t counter_freq;
+	uint32_t max_off_lvl;
 
 	/* Ensure we have been woken up from a suspended state */
-	assert((psci_get_aff_info_state() == AFF_STATE_ON) &&
-		(is_local_state_off(
-			state_info->pwr_domain_state[PSCI_CPU_PWR_LVL]) != 0));
+	assert(((uint8_t)psci_get_aff_info_state() == AFF_STATE_ON) && is_local_state_off(\
+			state_info->pwr_domain_state[PSCI_CPU_PWR_LVL]));
 
 	/*
 	 * Plat. management: Perform the platform specific actions
@@ -304,27 +292,19 @@ void psci_cpu_suspend_finish(unsigned int cpu_idx, const psci_power_state_t *sta
 	counter_freq = plat_get_syscnt_freq2();
 	write_cntfrq_el0(counter_freq);
 
-#if ENABLE_PAUTH
-	/* Store APIAKey_EL1 key */
-	set_cpu_data(apiakey[0], read_apiakeylo_el1());
-	set_cpu_data(apiakey[1], read_apiakeyhi_el1());
-#endif /* ENABLE_PAUTH */
-
 	/*
 	 * Call the cpu suspend finish handler registered by the Secure Payload
 	 * Dispatcher to let it do any bookeeping. If the handler encounters an
 	 * error, it's expected to assert within
 	 */
-	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_suspend_finish != NULL)) {
+	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_suspend != NULL)) {
 		max_off_lvl = psci_find_max_off_lvl(state_info);
-		assert(max_off_lvl != PSCI_INVALID_PWR_LVL);
+		assert (max_off_lvl != PSCI_INVALID_PWR_LVL);
 		psci_spd_pm->svc_suspend_finish(max_off_lvl);
 	}
 
 	/* Invalidate the suspend level for the cpu */
 	psci_set_suspend_pwrlvl(PSCI_INVALID_PWR_LVL);
-
-	PUBLISH_EVENT(psci_suspend_pwrdown_finish);
 
 	/*
 	 * Generic management: Now we just need to retrieve the

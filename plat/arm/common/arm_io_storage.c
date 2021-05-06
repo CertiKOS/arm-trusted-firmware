@@ -1,34 +1,195 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <common/debug.h>
-#include <drivers/io/io_driver.h>
-#include <drivers/io/io_fip.h>
-#include <drivers/io/io_memmap.h>
-#include <drivers/io/io_storage.h>
-#include <drivers/partition/partition.h>
-#include <lib/utils.h>
-
-#include <plat/arm/common/arm_fconf_getter.h>
-#include <plat/arm/common/arm_fconf_io_storage.h>
-#include <plat/arm/common/plat_arm.h>
-#include <plat/common/platform.h>
+#include <assert.h>
+#include <debug.h>
+#include <firmware_image_package.h>
+#include <io_driver.h>
+#include <io_fip.h>
+#include <io_memmap.h>
+#include <io_storage.h>
 #include <platform_def.h>
+#include <string.h>
+#include <utils.h>
 
 /* IO devices */
 static const io_dev_connector_t *fip_dev_con;
-uintptr_t fip_dev_handle;
+static uintptr_t fip_dev_handle;
 static const io_dev_connector_t *memmap_dev_con;
-uintptr_t memmap_dev_handle;
+static uintptr_t memmap_dev_handle;
+
+static const io_block_spec_t fip_block_spec = {
+	.offset = PLAT_ARM_FIP_BASE,
+	.length = PLAT_ARM_FIP_MAX_SIZE
+};
+
+static const io_uuid_spec_t bl2_uuid_spec = {
+	.uuid = UUID_TRUSTED_BOOT_FIRMWARE_BL2,
+};
+
+static const io_uuid_spec_t scp_bl2_uuid_spec = {
+	.uuid = UUID_SCP_FIRMWARE_SCP_BL2,
+};
+
+static const io_uuid_spec_t bl31_uuid_spec = {
+	.uuid = UUID_EL3_RUNTIME_FIRMWARE_BL31,
+};
+
+static const io_uuid_spec_t bl32_uuid_spec = {
+	.uuid = UUID_SECURE_PAYLOAD_BL32,
+};
+
+static const io_uuid_spec_t bl33_uuid_spec = {
+	.uuid = UUID_NON_TRUSTED_FIRMWARE_BL33,
+};
+
+#if TRUSTED_BOARD_BOOT
+static const io_uuid_spec_t tb_fw_cert_uuid_spec = {
+	.uuid = UUID_TRUSTED_BOOT_FW_CERT,
+};
+
+static const io_uuid_spec_t trusted_key_cert_uuid_spec = {
+	.uuid = UUID_TRUSTED_KEY_CERT,
+};
+
+static const io_uuid_spec_t scp_fw_key_cert_uuid_spec = {
+	.uuid = UUID_SCP_FW_KEY_CERT,
+};
+
+static const io_uuid_spec_t soc_fw_key_cert_uuid_spec = {
+	.uuid = UUID_SOC_FW_KEY_CERT,
+};
+
+static const io_uuid_spec_t tos_fw_key_cert_uuid_spec = {
+	.uuid = UUID_TRUSTED_OS_FW_KEY_CERT,
+};
+
+static const io_uuid_spec_t nt_fw_key_cert_uuid_spec = {
+	.uuid = UUID_NON_TRUSTED_FW_KEY_CERT,
+};
+
+static const io_uuid_spec_t scp_fw_cert_uuid_spec = {
+	.uuid = UUID_SCP_FW_CONTENT_CERT,
+};
+
+static const io_uuid_spec_t soc_fw_cert_uuid_spec = {
+	.uuid = UUID_SOC_FW_CONTENT_CERT,
+};
+
+static const io_uuid_spec_t tos_fw_cert_uuid_spec = {
+	.uuid = UUID_TRUSTED_OS_FW_CONTENT_CERT,
+};
+
+static const io_uuid_spec_t nt_fw_cert_uuid_spec = {
+	.uuid = UUID_NON_TRUSTED_FW_CONTENT_CERT,
+};
+#endif /* TRUSTED_BOARD_BOOT */
+
+
+static int open_fip(const uintptr_t spec);
+static int open_memmap(const uintptr_t spec);
+
+struct plat_io_policy {
+	uintptr_t *dev_handle;
+	uintptr_t image_spec;
+	int (*check)(const uintptr_t spec);
+};
+
+/* By default, ARM platforms load images from the FIP */
+static const struct plat_io_policy policies[] = {
+	[FIP_IMAGE_ID] = {
+		&memmap_dev_handle,
+		(uintptr_t)&fip_block_spec,
+		open_memmap
+	},
+	[BL2_IMAGE_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&bl2_uuid_spec,
+		open_fip
+	},
+	[SCP_BL2_IMAGE_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&scp_bl2_uuid_spec,
+		open_fip
+	},
+	[BL31_IMAGE_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&bl31_uuid_spec,
+		open_fip
+	},
+	[BL32_IMAGE_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&bl32_uuid_spec,
+		open_fip
+	},
+	[BL33_IMAGE_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&bl33_uuid_spec,
+		open_fip
+	},
+#if TRUSTED_BOARD_BOOT
+	[TRUSTED_BOOT_FW_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&tb_fw_cert_uuid_spec,
+		open_fip
+	},
+	[TRUSTED_KEY_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&trusted_key_cert_uuid_spec,
+		open_fip
+	},
+	[SCP_FW_KEY_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&scp_fw_key_cert_uuid_spec,
+		open_fip
+	},
+	[SOC_FW_KEY_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&soc_fw_key_cert_uuid_spec,
+		open_fip
+	},
+	[TRUSTED_OS_FW_KEY_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&tos_fw_key_cert_uuid_spec,
+		open_fip
+	},
+	[NON_TRUSTED_FW_KEY_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&nt_fw_key_cert_uuid_spec,
+		open_fip
+	},
+	[SCP_FW_CONTENT_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&scp_fw_cert_uuid_spec,
+		open_fip
+	},
+	[SOC_FW_CONTENT_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&soc_fw_cert_uuid_spec,
+		open_fip
+	},
+	[TRUSTED_OS_FW_CONTENT_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&tos_fw_cert_uuid_spec,
+		open_fip
+	},
+	[NON_TRUSTED_FW_CONTENT_CERT_ID] = {
+		&fip_dev_handle,
+		(uintptr_t)&nt_fw_cert_uuid_spec,
+		open_fip
+	},
+#endif /* TRUSTED_BOARD_BOOT */
+};
+
 
 /* Weak definitions may be overridden in specific ARM standard platform */
 #pragma weak plat_arm_io_setup
 #pragma weak plat_arm_get_alt_image_source
 
-int open_fip(const uintptr_t spec)
+
+static int open_fip(const uintptr_t spec)
 {
 	int result;
 	uintptr_t local_image_handle;
@@ -45,7 +206,8 @@ int open_fip(const uintptr_t spec)
 	return result;
 }
 
-int open_memmap(const uintptr_t spec)
+
+static int open_memmap(const uintptr_t spec)
 {
 	int result;
 	uintptr_t local_image_handle;
@@ -61,41 +223,33 @@ int open_memmap(const uintptr_t spec)
 	return result;
 }
 
-int arm_io_setup(void)
+
+void arm_io_setup(void)
 {
 	int io_result;
 
 	io_result = register_io_dev_fip(&fip_dev_con);
-	if (io_result < 0) {
-		return io_result;
-	}
+	assert(io_result == 0);
 
 	io_result = register_io_dev_memmap(&memmap_dev_con);
-	if (io_result < 0) {
-		return io_result;
-	}
+	assert(io_result == 0);
 
 	/* Open connections to devices and cache the handles */
 	io_result = io_dev_open(fip_dev_con, (uintptr_t)NULL,
 				&fip_dev_handle);
-	if (io_result < 0) {
-		return io_result;
-	}
+	assert(io_result == 0);
 
 	io_result = io_dev_open(memmap_dev_con, (uintptr_t)NULL,
 				&memmap_dev_handle);
+	assert(io_result == 0);
 
-	return io_result;
+	/* Ignore improbable errors in release builds */
+	(void)io_result;
 }
 
 void plat_arm_io_setup(void)
 {
-	int err;
-
-	err = arm_io_setup();
-	if (err < 0) {
-		panic();
-	}
+	arm_io_setup();
 }
 
 int plat_arm_get_alt_image_source(
@@ -115,7 +269,9 @@ int plat_get_image_source(unsigned int image_id, uintptr_t *dev_handle,
 	int result;
 	const struct plat_io_policy *policy;
 
-	policy = FCONF_GET_PROPERTY(arm, io_policies, image_id);
+	assert(image_id < ARRAY_SIZE(policies));
+
+	policy = &policies[image_id];
 	result = policy->check(policy->image_spec);
 	if (result == 0) {
 		*image_spec = policy->image_spec;
@@ -133,44 +289,12 @@ int plat_get_image_source(unsigned int image_id, uintptr_t *dev_handle,
  * See if a Firmware Image Package is available,
  * by checking if TOC is valid or not.
  */
-bool arm_io_is_toc_valid(void)
+int arm_io_is_toc_valid(void)
 {
-	return (io_dev_init(fip_dev_handle, (uintptr_t)FIP_IMAGE_ID) == 0);
+	int result;
+
+	result = io_dev_init(fip_dev_handle, (uintptr_t)FIP_IMAGE_ID);
+
+	return (result == 0);
 }
 
-#if ARM_GPT_SUPPORT
-/**********************************************************************
- * arm_set_image_source: Set image specification in IO policy
- *
- * @image_id: id of the image whose specification to be set
- *
- * @part_name: name of the partition that to be read for entry details
- *
- * set the entry and offset details of partition in global IO policy
- * of the image
- *********************************************************************/
-int arm_set_image_source(unsigned int image_id, const char *part_name)
-{
-	const partition_entry_t *entry = get_partition_entry(part_name);
-
-	if (entry == NULL) {
-		ERROR("Unable to find the %s partition\n", part_name);
-		return -ENOENT;
-	}
-
-	const struct plat_io_policy *policy = FCONF_GET_PROPERTY(arm,
-								 io_policies,
-								 image_id);
-
-	assert(policy != NULL);
-	assert(policy->image_spec != 0UL);
-
-	/* set offset and length of the image */
-	io_block_spec_t *image_spec = (io_block_spec_t *)policy->image_spec;
-
-	image_spec->offset = PLAT_ARM_FLASH_IMAGE_BASE + entry->start;
-	image_spec->length = entry->length;
-
-	return 0;
-}
-#endif

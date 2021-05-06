@@ -1,29 +1,27 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <cortex_a57.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
-#include <lib/mmio.h>
-#include <lib/psci/psci.h>
-#include <plat/common/platform.h>
-
+#include <assert.h>
 #include <bpmp.h>
+#include <cortex_a57.h>
+#include <debug.h>
+#include <delay_timer.h>
 #include <flowctrl.h>
-#include <lib/utils.h>
 #include <memctrl.h>
-#include <pmc.h>
+#include <mmio.h>
+#include <platform.h>
 #include <platform_def.h>
+#include <psci.h>
+#include <pmc.h>
 #include <security_engine.h>
 #include <tegra_def.h>
 #include <tegra_private.h>
 #include <tegra_platform.h>
+#include <utils.h>
 
 /*
  * Register used to clear CPU reset signals. Each CPU has two reset
@@ -90,6 +88,9 @@ int32_t tegra_soc_validate_power_state(unsigned int power_state,
 		ERROR("%s: unsupported state id (%d)\n", __func__, state_id);
 		return PSCI_E_INVALID_PARAMS;
 	}
+
+	/* flush the state to make it visible in the power down handler */
+	flush_dcache_range((uintptr_t)req_state, sizeof(psci_power_state_t));
 
 	return PSCI_E_SUCCESS;
 }
@@ -174,6 +175,17 @@ plat_local_state_t tegra_soc_get_target_pwr_state(unsigned int lvl,
 
 	} else if (((lvl == MPIDR_AFFLVL2) || (lvl == MPIDR_AFFLVL1)) &&
 	    (target == PSTATE_ID_SOC_POWERDN)) {
+
+		/* check if BPMP interface is available */
+		ret = tegra_bpmp_init();
+		if (ret != 0U) {
+			/*
+			 * flag to indicate that BPMP firmware is not
+			 * available and the CPU has to handle entry/exit
+			 * for all power states
+			 */
+			tegra_bpmp_available = false;
+		}
 
 		/* System Suspend */
 		target = PSTATE_ID_SOC_POWERDN;
@@ -405,8 +417,8 @@ int tegra_soc_pwr_domain_power_down_wfi(const psci_power_state_t *target_state)
 					TEGRA_IRAM_A_SIZE);
 
 			/* Copy the firmware to BPMP's internal RAM */
-			(void)memcpy((void *)(uintptr_t)TEGRA_IRAM_BASE,
-				(const void *)(plat_params->sc7entry_fw_base + SC7ENTRY_FW_HEADER_SIZE_BYTES),
+			tegra_memcpy(TEGRA_IRAM_BASE,
+				plat_params->sc7entry_fw_base + SC7ENTRY_FW_HEADER_SIZE_BYTES,
 				plat_params->sc7entry_fw_size - SC7ENTRY_FW_HEADER_SIZE_BYTES);
 
 			/* Power on the BPMP and execute from IRAM base */
@@ -423,11 +435,6 @@ int tegra_soc_pwr_domain_power_down_wfi(const psci_power_state_t *target_state)
 	}
 
 	return PSCI_E_SUCCESS;
-}
-
-int32_t tegra_soc_pwr_domain_suspend_pwrdown_early(const psci_power_state_t *target_state)
-{
-	return PSCI_E_NOT_SUPPORTED;
 }
 
 int tegra_soc_pwr_domain_on_finish(const psci_power_state_t *target_state)
@@ -494,7 +501,10 @@ int tegra_soc_pwr_domain_on_finish(const psci_power_state_t *target_state)
 		}
 
 		if (!tegra_chipid_is_t210_b01()) {
-			/* restrict PMC access to secure world */
+			/*
+			 * Mark PMC as secure to restrict NS access after System
+			 * resume.
+			 */
 			val = mmio_read_32(TEGRA_MISC_BASE + APB_SLAVE_SECURITY_ENABLE);
 			val |= PMC_SECURITY_EN_BIT;
 			mmio_write_32(TEGRA_MISC_BASE + APB_SLAVE_SECURITY_ENABLE, val);
@@ -548,11 +558,11 @@ int tegra_soc_pwr_domain_on_finish(const psci_power_state_t *target_state)
 	tegra_fc_lock_active_cluster();
 
 	/*
-	 * Resume PMC hardware block for Tegra210 platforms
-	 */
+         * Resume PMC hardware block for Tegra210 platforms
+         */
 	if (!tegra_chipid_is_t210_b01()) {
 		tegra_pmc_resume();
-	}
+        }
 
 	return PSCI_E_SUCCESS;
 }

@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TBBR_CONFIG_H
-#define TBBR_CONFIG_H
+#ifndef __TBBR_CONFIG_H__
+#define __TBBR_CONFIG_H__
 
 #include <stdint.h>
 
 #include <uuid.h>
 
+/* TODO: Update this number as required */
 #define TOC_HEADER_SERIAL_NUMBER 0x12345678
 
 typedef struct toc_entry {
@@ -21,8 +22,4 @@ typedef struct toc_entry {
 
 extern toc_entry_t toc_entries[];
 
-#ifdef PLAT_DEF_FIP_UUID
-extern toc_entry_t plat_def_toc_entries[];
-#endif
-
-#endif /* TBBR_CONFIG_H */
+#endif /* __TBBR_CONFIG_H__ */

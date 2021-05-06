@@ -1,13 +1,14 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <asm_macros.S>
-#include <bl32/tsp/tsp.h>
+#include <tsp.h>
 
 	.globl tsp_get_magic
+
 
 /*
  * This function raises an SMC to retrieve arguments from secure
@@ -15,13 +16,21 @@
  * and then returns to the caller
  */
 func tsp_get_magic
+	/* Save address to stack */
+	stp	x0, xzr, [sp, #-16]!
+
 	/* Load arguments */
 	ldr	w0, _tsp_fid_get_magic
 
 	/* Raise SMC */
 	smc	#0
 
-	/* Return arguments in x1:x0 */
+	/* Restore address from stack */
+	ldp	x4, xzr, [sp], #16
+
+	/* Store returned arguments to the array */
+	stp	x0, x1, [x4, #0]
+
 	ret
 endfunc tsp_get_magic
 

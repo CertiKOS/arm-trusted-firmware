@@ -1,19 +1,13 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TEGRA_DEF_H
-#define TEGRA_DEF_H
+#ifndef __TEGRA_DEF_H__
+#define __TEGRA_DEF_H__
 
-#include <lib/utils_def.h>
-
-/*******************************************************************************
- * Platform BL31 specific defines.
- ******************************************************************************/
-#define BL31_SIZE			U(0x40000)
+#include <utils_def.h>
 
 /*******************************************************************************
  * Power down state IDs
@@ -69,7 +63,9 @@
 /*******************************************************************************
  * Secure IRQ definitions
  ******************************************************************************/
+#define TEGRA210_WDT_CPU_IPI			U(15)
 #define TEGRA210_WDT_CPU_LEGACY_FIQ		U(28)
+#define TEGRA210_SEC_IRQ_TARGET_MASK		0x0FUL	/* 4 x A57 */
 
 /*******************************************************************************
  * Tegra Memory Select Switch Controller constants
@@ -91,16 +87,16 @@
 /*******************************************************************************
  * Tegra Resource Semaphore constants
  ******************************************************************************/
-#define TEGRA_RES_SEMA_BASE		0x60001000UL
-#define  STA_OFFSET			0UL
-#define  SET_OFFSET			4UL
-#define  CLR_OFFSET			8UL
+#define TEGRA_RES_SEMA_BASE		U(0x60001000)
+#define  STA_OFFSET			U(0)
+#define  SET_OFFSET			U(4)
+#define  CLR_OFFSET			U(8)
 
 /*******************************************************************************
  * Tegra Primary Interrupt Controller constants
  ******************************************************************************/
-#define TEGRA_PRI_ICTLR_BASE		0x60004000UL
-#define  CPU_IEP_FIR_SET		0x18UL
+#define TEGRA_PRI_ICTLR_BASE		U(0x60004000)
+#define  CPU_IEP_FIR_SET		U(0x18)
 
 /*******************************************************************************
  * Tegra micro-seconds timer constants
@@ -172,7 +168,7 @@
 /*******************************************************************************
  * Tegra AHB arbitration controller
  ******************************************************************************/
-#define TEGRA_AHB_ARB_BASE		0x6000C000UL
+#define TEGRA_AHB_ARB_BASE		U(0x6000C000)
 
 /*******************************************************************************
  * Tegra Secure Boot Controller constants
@@ -209,8 +205,6 @@
 #define TEGRA_FUSE_BASE			0x7000F800UL
 #define FUSE_BOOT_SECURITY_INFO		0x268UL
 #define FUSE_ATOMIC_SAVE_CARVEOUT_EN	(0x1U << 7)
-#define FUSE_JTAG_SECUREID_VALID	(0x104UL)
-#define ECID_VALID			(0x1UL)
 
 
 /*******************************************************************************
@@ -222,11 +216,11 @@
 /*******************************************************************************
  * Tegra Atomics constants
  ******************************************************************************/
-#define TEGRA_ATOMICS_BASE		0x70016000UL
-#define  TRIGGER0_REG_OFFSET		0UL
-#define  TRIGGER_WIDTH_SHIFT		4UL
-#define  TRIGGER_ID_SHIFT		16UL
-#define  RESULT0_REG_OFFSET		0xC00UL
+#define TEGRA_ATOMICS_BASE		U(0x70016000)
+#define  TRIGGER0_REG_OFFSET		U(0)
+#define  TRIGGER_WIDTH_SHIFT		U(4)
+#define  TRIGGER_ID_SHIFT		U(16)
+#define  RESULT0_REG_OFFSET		U(0xC00)
 
 /*******************************************************************************
  * Tegra Memory Controller constants
@@ -245,8 +239,6 @@
 #define MC_VIDEO_PROTECT_BASE_HI	U(0x978)
 #define MC_VIDEO_PROTECT_BASE_LO	U(0x648)
 #define MC_VIDEO_PROTECT_SIZE_MB	U(0x64c)
-#define MC_VIDEO_PROTECT_REG_CTRL	U(0x650)
-#define MC_VIDEO_PROTECT_WRITE_ACCESS_ENABLED	U(3)
 
 /* SMMU configuration registers*/
 #define MC_SMMU_PPCS_ASID_0		0x270U
@@ -281,8 +273,8 @@
 /*******************************************************************************
  * Tegra TZRAM carveout constants
  ******************************************************************************/
-#define TEGRA_TZRAM_CARVEOUT_BASE	U(0x7C04C000)
-#define TEGRA_TZRAM_CARVEOUT_SIZE	U(0x4000)
+#define TEGRA_TZRAM_CARVEOUT_BASE	0x7C04C000
+#define TEGRA_TZRAM_CARVEOUT_SIZE	0x4000
 
 /*******************************************************************************
  * Tegra DRAM memory base address
@@ -290,4 +282,4 @@
 #define TEGRA_DRAM_BASE			ULL(0x80000000)
 #define TEGRA_DRAM_END			ULL(0x27FFFFFFF)
 
-#endif /* TEGRA_DEF_H */
+#endif /* __TEGRA_DEF_H__ */

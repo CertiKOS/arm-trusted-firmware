@@ -1,7 +1,8 @@
 #
-# Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2016-2017, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+#
 #
 
 # Trusted Firmware shell command definitions for a Unix style environment.
@@ -10,7 +11,6 @@ ifndef UNIX_MK
     UNIX_MK := $(lastword $(MAKEFILE_LIST))
 
     ECHO_BLANK_LINE := echo
-    ECHO_QUIET := @\#
 
     DIR_DELIM := /
     PATH_SEP := :

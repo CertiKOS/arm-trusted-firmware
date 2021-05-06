@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2016-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <common/bl_common.h>
+#include <bl_common.h>
+
 
 	.globl	bl2_vector_table
 	.globl	bl2_entrypoint
@@ -25,14 +26,12 @@ vector_base bl2_vector_table
 
 func bl2_entrypoint
 	/*---------------------------------------------
-	 * Save arguments x0 - x3 from BL1 for future
-	 * use.
+	 * Save from r1 the extents of the trusted ram
+	 * available to BL2 for future use.
+	 * r0 is not currently used.
 	 * ---------------------------------------------
 	 */
-	mov	r9, r0
-	mov	r10, r1
-	mov	r11, r2
-	mov	r12, r3
+ 	mov	r11, r1
 
 	/* ---------------------------------------------
 	 * Set the exception vector to something sane.
@@ -42,13 +41,12 @@ func bl2_entrypoint
 	stcopr	r0, VBAR
 	isb
 
-	/* --------------------------------------------------------
-	 * Enable the instruction cache - disable speculative loads
-	 * --------------------------------------------------------
+	/* -----------------------------------------------------
+	 * Enable the instruction cache
+	 * -----------------------------------------------------
 	 */
 	ldcopr	r0, SCTLR
 	orr	r0, r0, #SCTLR_I_BIT
-	bic	r0, r0, #SCTLR_DSSBS_BIT
 	stcopr	r0, SCTLR
 	isb
 
@@ -80,14 +78,12 @@ func bl2_entrypoint
 	 * ---------------------------------------------
 	 */
 	ldr	r0, =__BSS_START__
-	ldr	r1, =__BSS_END__
-	sub 	r1, r1, r0
+	ldr	r1, =__BSS_SIZE__
 	bl	zeromem
 
 #if USE_COHERENT_MEM
 	ldr	r0, =__COHERENT_RAM_START__
-	ldr	r1, =__COHERENT_RAM_END_UNALIGNED__
-	sub 	r1, r1, r0
+	ldr	r1, =__COHERENT_RAM_UNALIGNED_SIZE__
 	bl	zeromem
 #endif
 
@@ -111,15 +107,13 @@ func bl2_entrypoint
 #endif
 
 	/* ---------------------------------------------
-	 * Perform BL2 setup
+	 * Perform early platform setup & platform
+	 * specific early arch. setup e.g. mmu setup
 	 * ---------------------------------------------
 	 */
-	mov	r0, r9
-	mov	r1, r10
-	mov	r2, r11
-	mov	r3, r12
-
-	bl	bl2_setup
+	mov	r0, r11
+	bl	bl2_early_platform_setup
+	bl	bl2_plat_arch_setup
 
 	/* ---------------------------------------------
 	 * Jump to main function.

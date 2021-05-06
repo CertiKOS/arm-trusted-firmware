@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <errno.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
+#include <debug.h>
 #include <denver.h>
-#include <lib/mmio.h>
-
+#include <mmio.h>
 #include <mce_private.h>
+#include <sys/errno.h>
 #include <t18x_ari.h>
 #include <tegra_private.h>
 

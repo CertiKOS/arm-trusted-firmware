@@ -4,20 +4,16 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
-#include <lib/mmio.h>
-
+#include <assert.h>
+#include <debug.h>
+#include <delay_timer.h>
 #include <dfs.h>
 #include <dram.h>
+#include <mmio.h>
 #include <m0_ctl.h>
+#include <platform_def.h>
 #include <plat_private.h>
-#include <pmu.h>
 #include <rk3399_def.h>
 #include <secure.h>
 #include <soc.h>
@@ -46,9 +42,6 @@ const unsigned char rockchip_power_domain_tree_desc[] = {
 
 /* sleep data for pll suspend */
 static struct deepsleep_data_s slp_data;
-
-/* sleep data that needs to be accessed from pmusram */
-__pmusramdata struct pmu_sleep_data pmu_slp_data;
 
 static void set_pll_slow_mode(uint32_t pll_id)
 {
@@ -178,6 +171,11 @@ void restore_abpll(void)
 	restore_pll(ABPLL_ID, slp_data.plls_con[ABPLL_ID]);
 }
 
+void restore_dpll(void)
+{
+	restore_pll(DPLL_ID, slp_data.plls_con[DPLL_ID]);
+}
+
 void clk_gate_con_save(void)
 {
 	uint32_t i = 0;
@@ -231,68 +229,6 @@ static void _pll_resume(uint32_t pll_id)
 	set_pll_normal_mode(pll_id);
 }
 
-void set_pmu_rsthold(void)
-{
-	uint32_t rstnhold_cofig0;
-	uint32_t rstnhold_cofig1;
-
-	pmu_slp_data.pmucru_rstnhold_con0 = mmio_read_32(PMUCRU_BASE +
-					    PMUCRU_RSTNHOLD_CON0);
-	pmu_slp_data.pmucru_rstnhold_con1 = mmio_read_32(PMUCRU_BASE +
-					    PMUCRU_RSTNHOLD_CON1);
-	rstnhold_cofig0 = BIT_WITH_WMSK(PRESETN_NOC_PMU_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_INTMEM_PMU_HOLD) |
-			  BIT_WITH_WMSK(HRESETN_CM0S_PMU_HOLD) |
-			  BIT_WITH_WMSK(HRESETN_CM0S_NOC_PMU_HOLD) |
-			  BIT_WITH_WMSK(DRESETN_CM0S_PMU_HOLD) |
-			  BIT_WITH_WMSK(POESETN_CM0S_PMU_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_TIMER_PMU_0_1_HOLD) |
-			  BIT_WITH_WMSK(RESETN_TIMER_PMU_0_HOLD) |
-			  BIT_WITH_WMSK(RESETN_TIMER_PMU_1_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_UART_M0_PMU_HOLD) |
-			  BIT_WITH_WMSK(RESETN_UART_M0_PMU_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_WDT_PMU_HOLD);
-	rstnhold_cofig1 = BIT_WITH_WMSK(PRESETN_RKPWM_PMU_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_PMUGRF_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_SGRF_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_GPIO0_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_GPIO1_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_CRU_PMU_HOLD) |
-			  BIT_WITH_WMSK(PRESETN_PVTM_PMU_HOLD);
-
-	mmio_write_32(PMUCRU_BASE + PMUCRU_RSTNHOLD_CON0, rstnhold_cofig0);
-	mmio_write_32(PMUCRU_BASE + PMUCRU_RSTNHOLD_CON1, rstnhold_cofig1);
-}
-
-void pmu_sgrf_rst_hld(void)
-{
-	mmio_write_32(PMUCRU_BASE + CRU_PMU_RSTHOLD_CON(1),
-		      CRU_PMU_SGRF_RST_HOLD);
-}
-
-/*
- * When system reset in running state, we want the cpus to be reboot
- * from maskrom (system reboot),
- * the pmusgrf reset-hold bits needs to be released.
- * When system wake up from system deep suspend, some soc will be reset
- * when waked up,
- * we want the bootcpu to be reboot from pmusram,
- * the pmusgrf reset-hold bits needs to be held.
- */
-__pmusramfunc void pmu_sgrf_rst_hld_release(void)
-{
-	mmio_write_32(PMUCRU_BASE + CRU_PMU_RSTHOLD_CON(1),
-		      CRU_PMU_SGRF_RST_RLS);
-}
-
-__pmusramfunc void restore_pmu_rsthold(void)
-{
-	mmio_write_32(PMUCRU_BASE + PMUCRU_RSTNHOLD_CON0,
-		      pmu_slp_data.pmucru_rstnhold_con0 | REG_SOC_WMSK);
-	mmio_write_32(PMUCRU_BASE + PMUCRU_RSTNHOLD_CON1,
-		      pmu_slp_data.pmucru_rstnhold_con1 | REG_SOC_WMSK);
-}
-
 /**
  * enable_dvfs_plls - To resume the specific PLLs
  *
@@ -328,7 +264,6 @@ void soc_global_soft_reset_init(void)
 
 void __dead2 soc_global_soft_reset(void)
 {
-	pmu_power_domains_on();
 	set_pll_slow_mode(VPLL_ID);
 	set_pll_slow_mode(NPLL_ID);
 	set_pll_slow_mode(GPLL_ID);

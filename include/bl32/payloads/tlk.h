@@ -1,14 +1,13 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TLK_H
-#define TLK_H
+#ifndef __TLK_H__
+#define __TLK_H__
 
-#include <lib/utils_def.h>
+#include <utils_def.h>
 
 /*
  * Generate function IDs for the Trusted OS/Apps
@@ -69,4 +68,4 @@
 #define TOS_UID			0xbf00ff01 /* Implementation UID */
 #define TOS_CALL_VERSION	0xbf00ff03 /* Trusted OS Call Version */
 
-#endif /* TLK_H */
+#endif /* __TLK_H__ */

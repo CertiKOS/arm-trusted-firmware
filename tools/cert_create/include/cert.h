@@ -1,18 +1,18 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef CERT_H
-#define CERT_H
+#ifndef CERT_H_
+#define CERT_H_
 
 #include <openssl/ossl_typ.h>
 #include <openssl/x509.h>
 #include "ext.h"
 #include "key.h"
 
-#define CERT_MAX_EXT			9
+#define CERT_MAX_EXT			4
 
 /*
  * This structure contains information related to the generation of the
@@ -48,29 +48,15 @@ struct cert_s {
 int cert_init(void);
 cert_t *cert_get_by_opt(const char *opt);
 int cert_add_ext(X509 *issuer, X509 *subject, int nid, char *value);
-int cert_new(
-	int md_alg,
-	cert_t *cert,
-	int days,
-	int ca,
-	STACK_OF(X509_EXTENSION) * sk);
+int cert_new(cert_t *cert, int days, int ca, STACK_OF(X509_EXTENSION) * sk);
 
 /* Macro to register the certificates used in the CoT */
 #define REGISTER_COT(_certs) \
-	cert_t *def_certs = &_certs[0]; \
-	const unsigned int num_def_certs = sizeof(_certs)/sizeof(_certs[0])
-
-/* Macro to register the platform defined certificates used in the CoT */
-#define PLAT_REGISTER_COT(_pdef_certs) \
-	cert_t *pdef_certs = &_pdef_certs[0]; \
-	const unsigned int num_pdef_certs = sizeof(_pdef_certs)/sizeof(_pdef_certs[0])
+	cert_t *certs = &_certs[0]; \
+	const unsigned int num_certs = sizeof(_certs)/sizeof(_certs[0])
 
 /* Exported variables */
-extern cert_t *def_certs;
-extern const unsigned int num_def_certs;
-extern cert_t *pdef_certs;
-extern const unsigned int num_pdef_certs;
-
 extern cert_t *certs;
-extern unsigned int num_certs;
-#endif /* CERT_H */
+extern const unsigned int num_certs;
+
+#endif /* CERT_H_ */

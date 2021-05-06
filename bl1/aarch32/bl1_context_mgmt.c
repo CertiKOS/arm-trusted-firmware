@@ -1,19 +1,16 @@
 /*
- * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
+#include <assert.h>
 #include <context.h>
-#include <common/debug.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <plat/common/platform.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <platform.h>
 #include <smccc_helpers.h>
-
-#include "../bl1_private.h"
 
 /*
  * Following arrays will be used for context management.
@@ -29,13 +26,13 @@ static void *bl1_next_cpu_context_ptr;
 static void *bl1_next_smc_context_ptr;
 
 /* Following functions are used for SMC context handling */
-void *smc_get_ctx(unsigned int security_state)
+void *smc_get_ctx(int security_state)
 {
 	assert(sec_state_is_valid(security_state));
 	return &bl1_smc_context[security_state];
 }
 
-void smc_set_next_ctx(unsigned int security_state)
+void smc_set_next_ctx(int security_state)
 {
 	assert(sec_state_is_valid(security_state));
 	bl1_next_smc_context_ptr = &bl1_smc_context[security_state];
@@ -53,10 +50,10 @@ void *cm_get_context(uint32_t security_state)
 	return &bl1_cpu_context[security_state];
 }
 
-void cm_set_next_context(void *context)
+void cm_set_next_context(void *cpu_context)
 {
-	assert(context != NULL);
-	bl1_next_cpu_context_ptr = context;
+	assert(cpu_context);
+	bl1_next_cpu_context_ptr = cpu_context;
 }
 
 void *cm_get_next_context(void)
@@ -102,27 +99,34 @@ static void flush_smc_and_cpu_ctx(void)
  ******************************************************************************/
 void bl1_prepare_next_image(unsigned int image_id)
 {
-	unsigned int security_state, mode = MODE32_svc;
-	image_desc_t *desc;
+	unsigned int security_state;
+	image_desc_t *image_desc;
 	entry_point_info_t *next_bl_ep;
 
 	/* Get the image descriptor. */
-	desc = bl1_plat_get_image_desc(image_id);
-	assert(desc != NULL);
+	image_desc = bl1_plat_get_image_desc(image_id);
+	assert(image_desc);
 
 	/* Get the entry point info. */
-	next_bl_ep = &desc->ep_info;
+	next_bl_ep = &image_desc->ep_info;
 
 	/* Get the image security state. */
 	security_state = GET_SECURITY_STATE(next_bl_ep->h.attr);
 
 	/* Prepare the SPSR for the next BL image. */
-	if ((security_state != SECURE) && (GET_VIRT_EXT(read_id_pfr1()) != 0U)) {
-		mode = MODE32_hyp;
-	}
-
-	next_bl_ep->spsr = SPSR_MODE32(mode, SPSR_T_ARM,
+	if (security_state == SECURE) {
+		next_bl_ep->spsr = SPSR_MODE32(MODE32_svc, SPSR_T_ARM,
+			SPSR_E_LITTLE, DISABLE_ALL_EXCEPTIONS);
+	} else {
+		/* Use HYP mode if supported else use SVC. */
+		if (GET_VIRT_EXT(read_id_pfr1())) {
+			next_bl_ep->spsr = SPSR_MODE32(MODE32_hyp, SPSR_T_ARM,
 				SPSR_E_LITTLE, DISABLE_ALL_EXCEPTIONS);
+		} else {
+			next_bl_ep->spsr = SPSR_MODE32(MODE32_svc, SPSR_T_ARM,
+				SPSR_E_LITTLE, DISABLE_ALL_EXCEPTIONS);
+		}
+	}
 
 	/* Allow platform to make change */
 	bl1_plat_set_ep_info(image_id, next_bl_ep);
@@ -166,7 +170,7 @@ void bl1_prepare_next_image(unsigned int image_id)
 	flush_smc_and_cpu_ctx();
 
 	/* Indicate that image is in execution state. */
-	desc->state = IMAGE_STATE_EXECUTED;
+	image_desc->state = IMAGE_STATE_EXECUTED;
 
 	print_entry_point_info(next_bl_ep);
 }

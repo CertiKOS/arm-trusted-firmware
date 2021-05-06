@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef IO_SEMIHOSTING_H
-#define IO_SEMIHOSTING_H
+#ifndef __IO_SH_H__
+#define __IO_SH_H__
 
 struct io_dev_connector;
 
 int register_io_dev_sh(const struct io_dev_connector **dev_con);
 
-#endif /* IO_SEMIHOSTING_H */
+#endif /* __IO_SH_H__ */

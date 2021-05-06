@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef MTK_SIP_SVC_H
-#define MTK_SIP_SVC_H
+#ifndef __PLAT_SIP_SVC_H__
+#define __PLAT_SIP_SVC_H__
 
 #include <stdint.h>
 
@@ -31,10 +31,6 @@
 #define MTK_SIP_KERNEL_BOOT_AARCH32		0x82000200
 #define MTK_SIP_KERNEL_BOOT_AARCH64		0xC2000200
 
-/* VCORE */
-#define MTK_SIP_VCORE_CONTROL_ARCH32		0x82000506
-#define MTK_SIP_VCORE_CONTROL_ARCH64		0xC2000506
-
 /* Mediatek SiP Calls error code */
 enum {
 	MTK_SIP_E_SUCCESS = 0,
@@ -54,4 +50,4 @@ enum {
  */
 uint64_t mt_sip_set_authorized_sreg(uint32_t sreg, uint32_t val);
 
-#endif /* MTK_SIP_SVC_H */
+#endif /* __PLAT_SIP_SVC_H__ */

@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PSCI_LIB_H
-#define PSCI_LIB_H
+#ifndef __PSCI_LIB_H__
+#define __PSCI_LIB_H__
 
-#include <common/ep_info.h>
+#include <ep_info.h>
 
-#ifndef __ASSEMBLER__
-
-#include <cdefs.h>
-#include <stdint.h>
+#ifndef __ASSEMBLY__
+#include <types.h>
 
 /*******************************************************************************
  * Optional structure populated by the Secure Payload Dispatcher to be given a
@@ -22,9 +20,9 @@
  ******************************************************************************/
 typedef struct spd_pm_ops {
 	void (*svc_on)(u_register_t target_cpu);
-	int32_t (*svc_off)(u_register_t __unused unused);
+	int32_t (*svc_off)(u_register_t __unused);
 	void (*svc_suspend)(u_register_t max_off_pwrlvl);
-	void (*svc_on_finish)(u_register_t __unused unused);
+	void (*svc_on_finish)(u_register_t __unused);
 	void (*svc_suspend_finish)(u_register_t max_off_pwrlvl);
 	int32_t (*svc_migrate)(u_register_t from_cpu, u_register_t to_cpu);
 	int32_t (*svc_migrate_info)(u_register_t *resident_cpu);
@@ -45,7 +43,7 @@ typedef struct psci_lib_args {
 	/* The version information of PSCI Library Interface */
 	param_header_t		h;
 	/* The warm boot entrypoint function */
-	mailbox_entrypoint_t	mailbox_ep;
+	uintptr_t		mailbox_ep;
 } psci_lib_args_t;
 
 /* Helper macro to set the psci_lib_args_t structure at runtime */
@@ -60,7 +58,7 @@ typedef struct psci_lib_args {
 		.h.type = (uint8_t)PARAM_PSCI_LIB_ARGS,		\
 		.h.version = (uint8_t)VERSION_1,		\
 		.h.size = (uint16_t)sizeof(_name),		\
-		.h.attr = 0U,					\
+		.h.attr = 0,					\
 		.mailbox_ep = (_entry)				\
 	}
 
@@ -69,8 +67,8 @@ typedef struct psci_lib_args {
 		&& ((_p)->h.type == PARAM_PSCI_LIB_ARGS)	\
 		&& ((_p)->h.version == VERSION_1)		\
 		&& ((_p)->h.size == sizeof(*(_p)))		\
-		&& ((_p)->h.attr == 0)				\
-		&& ((_p)->mailbox_ep != NULL))
+		&& ((_p)->h.attr == 0U)				\
+		&& ((_p)->mailbox_ep != 0U))
 
 /******************************************************************************
  * PSCI Library Interfaces
@@ -83,14 +81,13 @@ u_register_t psci_smc_handler(uint32_t smc_fid,
 			  void *cookie,
 			  void *handle,
 			  u_register_t flags);
-int psci_setup(const psci_lib_args_t *lib_args);
-int psci_secondaries_brought_up(void);
+int32_t psci_setup(const psci_lib_args_t *lib_args);
+int32_t psci_secondaries_brought_up(void);
 void psci_warmboot_entrypoint(void);
 void psci_register_spd_pm_hook(const spd_pm_ops_t *pm);
 void psci_prepare_next_non_secure_ctx(
 			  entry_point_info_t *next_image_info);
-int psci_stop_other_cores(unsigned int wait_ms,
-			  void (*stop_func)(u_register_t mpidr));
-#endif /* __ASSEMBLER__ */
+#endif /* __ASSEMBLY__ */
 
-#endif /* PSCI_LIB_H */
+#endif /* __PSCI_LIB_H */
+

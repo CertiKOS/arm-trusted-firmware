@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef MEMCTRL_V1_H
-#define MEMCTRL_V1_H
+#ifndef __MEMCTRLV1_H__
+#define __MEMCTRLV1_H__
 
-#include <lib/mmio.h>
-
+#include <mmio.h>
 #include <tegra_def.h>
 
 /* SMMU registers */
@@ -54,4 +53,4 @@ static inline void tegra_mc_write_32(uint32_t off, uint32_t val)
 	mmio_write_32(TEGRA_MC_BASE + off, val);
 }
 
-#endif /* MEMCTRL_V1_H */
+#endif /* __MEMCTRLV1_H__ */

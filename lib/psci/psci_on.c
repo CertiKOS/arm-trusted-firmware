@@ -1,48 +1,34 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <stddef.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/el3_runtime/pubsub_events.h>
-#include <plat/common/platform.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <debug.h>
+#include <context_mgmt.h>
+#include <platform.h>
+#include <stddef.h>
 #include "psci_private.h"
-
-/*
- * Helper functions for the CPU level spinlocks
- */
-static inline void psci_spin_lock_cpu(unsigned int idx)
-{
-	spin_lock(&psci_cpu_pd_nodes[idx].cpu_lock);
-}
-
-static inline void psci_spin_unlock_cpu(unsigned int idx)
-{
-	spin_unlock(&psci_cpu_pd_nodes[idx].cpu_lock);
-}
 
 /*******************************************************************************
  * This function checks whether a cpu which has been requested to be turned on
  * is OFF to begin with.
  ******************************************************************************/
-static int cpu_on_validate_state(aff_info_state_t aff_state)
+static int32_t cpu_on_validate_state(aff_info_state_t aff_state)
 {
-	if (aff_state == AFF_STATE_ON)
+	if ((uint8_t)aff_state == AFF_STATE_ON) {
 		return PSCI_E_ALREADY_ON;
+	}
 
-	if (aff_state == AFF_STATE_ON_PENDING)
+	if ((uint8_t)aff_state == AFF_STATE_ON_PENDING) {
 		return PSCI_E_ON_PENDING;
+	}
 
-	assert(aff_state == AFF_STATE_OFF);
+	assert((uint8_t)aff_state == AFF_STATE_OFF);
 	return PSCI_E_SUCCESS;
 }
 
@@ -56,25 +42,23 @@ static int cpu_on_validate_state(aff_info_state_t aff_state)
  * The state of all the relevant power domains are changed after calling the
  * platform handler as it can return error.
  ******************************************************************************/
-int psci_cpu_on_start(u_register_t target_cpu,
-		      const entry_point_info_t *ep)
+int32_t psci_cpu_on_start(u_register_t target_cpu,
+		      entry_point_info_t *ep)
 {
-	int rc;
+	int32_t rc;
+	uint32_t target_idx = (uint32_t)plat_core_pos_by_mpidr(target_cpu);
 	aff_info_state_t target_aff_state;
-	int ret = plat_core_pos_by_mpidr(target_cpu);
-	unsigned int target_idx = (unsigned int)ret;
 
 	/* Calling function must supply valid input arguments */
-	assert(ret >= 0);
+	assert((int32_t) target_idx >= 0);
 	assert(ep != NULL);
-
 
 	/*
 	 * This function must only be called on platforms where the
 	 * CPU_ON platform hooks have been implemented.
 	 */
 	assert((psci_plat_pm_ops->pwr_domain_on != NULL) &&
-	       (psci_plat_pm_ops->pwr_domain_on_finish != NULL));
+			(psci_plat_pm_ops->pwr_domain_on_finish != NULL));
 
 	/* Protect against multiple CPUs trying to turn ON the same target CPU */
 	psci_spin_lock_cpu(target_idx);
@@ -82,32 +66,20 @@ int psci_cpu_on_start(u_register_t target_cpu,
 	/*
 	 * Generic management: Ensure that the cpu is off to be
 	 * turned on.
-	 * Perform cache maintanence ahead of reading the target CPU state to
-	 * ensure that the data is not stale.
-	 * There is a theoretical edge case where the cache may contain stale
-	 * data for the target CPU data - this can occur under the following
-	 * conditions:
-	 * - the target CPU is in another cluster from the current
-	 * - the target CPU was the last CPU to shutdown on its cluster
-	 * - the cluster was removed from coherency as part of the CPU shutdown
-	 *
-	 * In this case the cache maintenace that was performed as part of the
-	 * target CPUs shutdown was not seen by the current CPU's cluster. And
-	 * so the cache may contain stale data for the target CPU.
 	 */
-	flush_cpu_data_by_index(target_idx,
-				psci_svc_cpu_data.aff_info_state);
 	rc = cpu_on_validate_state(psci_get_aff_info_state_by_idx(target_idx));
-	if (rc != PSCI_E_SUCCESS)
+	if (rc != PSCI_E_SUCCESS) {
 		goto exit;
+	}
 
 	/*
 	 * Call the cpu on handler registered by the Secure Payload Dispatcher
 	 * to let it do any bookeeping. If the handler encounters an error, it's
 	 * expected to assert within
 	 */
-	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_on != NULL))
+	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_on != NULL)) {
 		psci_spd_pm->svc_on(target_cpu);
+	}
 
 	/*
 	 * Set the Affinity info state of the target cpu to ON_PENDING.
@@ -115,8 +87,7 @@ int psci_cpu_on_start(u_register_t target_cpu,
 	 * turned OFF.
 	 */
 	psci_set_aff_info_state_by_idx(target_idx, AFF_STATE_ON_PENDING);
-	flush_cpu_data_by_index(target_idx,
-				psci_svc_cpu_data.aff_info_state);
+	flush_cpu_data_by_index(target_idx, psci_svc_cpu_data.aff_info_state);
 
 	/*
 	 * The cache line invalidation by the target CPU after setting the
@@ -125,14 +96,12 @@ int psci_cpu_on_start(u_register_t target_cpu,
 	 * CPU aff_info_state is not ON_PENDING.
 	 */
 	target_aff_state = psci_get_aff_info_state_by_idx(target_idx);
-	if (target_aff_state != AFF_STATE_ON_PENDING) {
-		assert(target_aff_state == AFF_STATE_OFF);
+	if ((uint8_t)target_aff_state != AFF_STATE_ON_PENDING) {
+		assert((uint8_t)target_aff_state == AFF_STATE_OFF);
 		psci_set_aff_info_state_by_idx(target_idx, AFF_STATE_ON_PENDING);
-		flush_cpu_data_by_index(target_idx,
-					psci_svc_cpu_data.aff_info_state);
+		flush_cpu_data_by_index(target_idx, psci_svc_cpu_data.aff_info_state);
 
-		assert(psci_get_aff_info_state_by_idx(target_idx) ==
-		       AFF_STATE_ON_PENDING);
+		assert((uint8_t)psci_get_aff_info_state_by_idx(target_idx) == AFF_STATE_ON_PENDING);
 	}
 
 	/*
@@ -144,16 +113,15 @@ int psci_cpu_on_start(u_register_t target_cpu,
 	 * steps to power on.
 	 */
 	rc = psci_plat_pm_ops->pwr_domain_on(target_cpu);
-	assert((rc == PSCI_E_SUCCESS) || (rc == PSCI_E_INTERN_FAIL));
+	assert(rc == PSCI_E_SUCCESS || rc == PSCI_E_INTERN_FAIL);
 
-	if (rc == PSCI_E_SUCCESS)
+	if (rc == PSCI_E_SUCCESS) {
 		/* Store the re-entry information for the non-secure world. */
 		cm_init_context_by_index(target_idx, ep);
-	else {
+	} else {
 		/* Restore the state on error. */
 		psci_set_aff_info_state_by_idx(target_idx, AFF_STATE_OFF);
-		flush_cpu_data_by_index(target_idx,
-					psci_svc_cpu_data.aff_info_state);
+		flush_cpu_data_by_index(target_idx, psci_svc_cpu_data.aff_info_state);
 	}
 
 exit:
@@ -166,7 +134,8 @@ exit:
  * are called by the common finisher routine in psci_common.c. The `state_info`
  * is the psci_power_state from which this CPU has woken up from.
  ******************************************************************************/
-void psci_cpu_on_finish(unsigned int cpu_idx, const psci_power_state_t *state_info)
+void psci_cpu_on_finish(uint32_t cpu_idx,
+			psci_power_state_t *state_info)
 {
 	/*
 	 * Plat. management: Perform the platform specific actions
@@ -182,14 +151,6 @@ void psci_cpu_on_finish(unsigned int cpu_idx, const psci_power_state_t *state_in
 	 */
 	psci_do_pwrup_cache_maintenance();
 #endif
-
-	/*
-	 * Plat. management: Perform any platform specific actions which
-	 * can only be done with the cpu and the cluster guaranteed to
-	 * be coherent.
-	 */
-	if (psci_plat_pm_ops->pwr_domain_on_finish_late != NULL)
-		psci_plat_pm_ops->pwr_domain_on_finish_late(state_info);
 
 	/*
 	 * All the platform specific actions for turning this cpu
@@ -208,17 +169,16 @@ void psci_cpu_on_finish(unsigned int cpu_idx, const psci_power_state_t *state_in
 	psci_spin_unlock_cpu(cpu_idx);
 
 	/* Ensure we have been explicitly woken up by another cpu */
-	assert(psci_get_aff_info_state() == AFF_STATE_ON_PENDING);
+	assert((uint8_t)psci_get_aff_info_state() == AFF_STATE_ON_PENDING);
 
 	/*
 	 * Call the cpu on finish handler registered by the Secure Payload
 	 * Dispatcher to let it do any bookeeping. If the handler encounters an
 	 * error, it's expected to assert within
 	 */
-	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_on_finish != NULL))
+	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_on_finish != NULL)) {
 		psci_spd_pm->svc_on_finish(0);
-
-	PUBLISH_EVENT(psci_cpu_on_finish);
+	}
 
 	/* Populate the mpidr field within the cpu node array */
 	/* This needs to be done only once */

@@ -1,14 +1,11 @@
 #
-# Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
 TSPD_DIR		:=	services/spd/tspd
-
-ifeq (${ERROR_DEPRECATED},0)
 SPD_INCLUDES		:=	-Iinclude/bl32/tsp
-endif
 
 SPD_SOURCES		:=	services/spd/tspd/tspd_common.c		\
 				services/spd/tspd/tspd_helpers.S	\
@@ -36,10 +33,14 @@ NEED_BL32		:=	yes
 # generated while the code is executing in S-EL1/0.
 TSP_NS_INTR_ASYNC_PREEMPT	:=	0
 
-ifeq ($(EL3_EXCEPTION_HANDLING),1)
-ifeq ($(TSP_NS_INTR_ASYNC_PREEMPT),0)
-$(error When EL3_EXCEPTION_HANDLING=1, TSP_NS_INTR_ASYNC_PREEMPT must also be 1)
+# If TSPD_ROUTE_IRQ_TO_EL3 build flag is defined, use it to define value for
+# TSP_NS_INTR_ASYNC_PREEMPT for backward compatibility.
+ifdef TSPD_ROUTE_IRQ_TO_EL3
+ifeq (${ERROR_DEPRECATED},1)
+$(error "TSPD_ROUTE_IRQ_TO_EL3 is deprecated. Please use the new build flag TSP_NS_INTR_ASYNC_PREEMPT")
 endif
+$(warning "TSPD_ROUTE_IRQ_TO_EL3 is deprecated. Please use the new build flag TSP_NS_INTR_ASYNC_PREEMPT")
+TSP_NS_INTR_ASYNC_PREEMPT	:= ${TSPD_ROUTE_IRQ_TO_EL3}
 endif
 
 $(eval $(call assert_boolean,TSP_NS_INTR_ASYNC_PREEMPT))

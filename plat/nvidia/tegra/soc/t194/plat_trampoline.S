@@ -1,18 +1,42 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of ARM nor the names of its contributors may be used
+ * to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <plat/common/common_def.h>
+#include <common_def.h>
 #include <memctrl_v2.h>
 #include <tegra_def.h>
 
 #define TEGRA194_STATE_SYSTEM_SUSPEND	0x5C7
 #define TEGRA194_STATE_SYSTEM_RESUME	0x600D
-#define TEGRA194_MC_CTX_SIZE		0xFB
+#define TEGRA194_SMMU_CTX_SIZE		0x80D
 
 	.align 4
 	.globl	tegra194_cpu_reset_handler
@@ -76,8 +100,8 @@ endfunc tegra194_cpu_reset_handler
 	 *
 	 * 0x0000: secure world's entrypoint
 	 * 0x0008: BL31 size (RO + RW)
-	 * 0x0010: MC context start
-	 * 0x2490: MC context end
+	 * 0x0010: SMMU context start
+	 * 0x2490: SMMU context end
 	 */
 
 	.align 4
@@ -86,13 +110,15 @@ endfunc tegra194_cpu_reset_handler
 __tegra194_cpu_reset_handler_data:
 	.quad	tegra_secure_entrypoint
 	.quad	__BL31_END__ - BL31_BASE
+	.globl	__tegra194_smmu_ctx_start
+
 	.globl	__tegra194_system_suspend_state
 __tegra194_system_suspend_state:
 	.quad	0
 
 	.align 4
-__tegra194_mc_context:
-	.rept	TEGRA194_MC_CTX_SIZE
+__tegra194_smmu_context:
+	.rept	TEGRA194_SMMU_CTX_SIZE
 	.quad	0
 	.endr
 	.size	__tegra194_cpu_reset_handler_data, \
@@ -104,7 +130,7 @@ __tegra194_cpu_reset_handler_end:
 
 	.globl tegra194_get_cpu_reset_handler_size
 	.globl tegra194_get_cpu_reset_handler_base
-	.globl tegra194_get_mc_ctx_offset
+	.globl tegra194_get_smmu_ctx_offset
 	.globl tegra194_set_system_suspend_entry
 
 /* return size of the CPU reset handler */
@@ -121,13 +147,13 @@ func tegra194_get_cpu_reset_handler_base
 	ret
 endfunc tegra194_get_cpu_reset_handler_base
 
-/* return the size of the MC context */
-func tegra194_get_mc_ctx_offset
-	adr	x0, __tegra194_mc_context
+/* return the size of the SMMU context */
+func tegra194_get_smmu_ctx_offset
+	adr	x0, __tegra194_smmu_context
 	adr	x1, tegra194_cpu_reset_handler
 	sub	x0, x0, x1
 	ret
-endfunc tegra194_get_mc_ctx_offset
+endfunc tegra194_get_smmu_ctx_offset
 
 /* set system suspend state before SC7 entry */
 func tegra194_set_system_suspend_entry

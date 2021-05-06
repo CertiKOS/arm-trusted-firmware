@@ -1,16 +1,15 @@
 /*
- * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <string.h>
-
 #include <arch_helpers.h>
-#include <lib/bakery_lock.h>
-#include <lib/el3_runtime/cpu_data.h>
-#include <plat/common/platform.h>
+#include <assert.h>
+#include <bakery_lock.h>
+#include <cpu_data.h>
+#include <platform.h>
+#include <string.h>
 
 /*
  * Functions in this file implement Bakery Algorithm for mutual exclusion with the
@@ -35,10 +34,10 @@
  * accesses regardless of status of address translation.
  */
 
-#define assert_bakery_entry_valid(_entry, _bakery) do {	\
-	assert((_bakery) != NULL);			\
-	assert((_entry) < BAKERY_LOCK_MAX_CPUS);	\
-} while (false)
+#define assert_bakery_entry_valid(entry, bakery) do {	\
+	assert(bakery);					\
+	assert(entry < BAKERY_LOCK_MAX_CPUS);		\
+} while (0)
 
 /* Obtain a ticket for a given CPU */
 static unsigned int bakery_get_ticket(bakery_lock_t *bakery, unsigned int me)
@@ -47,7 +46,7 @@ static unsigned int bakery_get_ticket(bakery_lock_t *bakery, unsigned int me)
 	unsigned int they;
 
 	/* Prevent recursive acquisition */
-	assert(bakery_ticket_number(bakery->lock_data[me]) == 0U);
+	assert(!bakery_ticket_number(bakery->lock_data[me]));
 
 	/*
 	 * Flag that we're busy getting our ticket. All CPUs are iterated in the
@@ -59,9 +58,9 @@ static unsigned int bakery_get_ticket(bakery_lock_t *bakery, unsigned int me)
 	 * ticket value. That's OK as the lock is acquired based on the priority
 	 * value, not the ticket value alone.
 	 */
-	my_ticket = 0U;
+	my_ticket = 0;
 	bakery->lock_data[me] = make_bakery_data(CHOOSING_TICKET, my_ticket);
-	for (they = 0U; they < BAKERY_LOCK_MAX_CPUS; they++) {
+	for (they = 0; they < BAKERY_LOCK_MAX_CPUS; they++) {
 		their_ticket = bakery_ticket_number(bakery->lock_data[they]);
 		if (their_ticket > my_ticket)
 			my_ticket = their_ticket;
@@ -106,8 +105,8 @@ void bakery_lock_get(bakery_lock_t *bakery)
 	 * Now that we got our ticket, compute our priority value, then compare
 	 * with that of others, and proceed to acquire the lock
 	 */
-	my_prio = bakery_get_priority(my_ticket, me);
-	for (they = 0U; they < BAKERY_LOCK_MAX_CPUS; they++) {
+	my_prio = PRIORITY(my_ticket, me);
+	for (they = 0; they < BAKERY_LOCK_MAX_CPUS; they++) {
 		if (me == they)
 			continue;
 
@@ -121,8 +120,7 @@ void bakery_lock_get(bakery_lock_t *bakery)
 		 * (valid) ticket value. If they do, compare priorities
 		 */
 		their_ticket = bakery_ticket_number(their_bakery_data);
-		if ((their_ticket != 0U) &&
-		    (bakery_get_priority(their_ticket, they) < my_prio)) {
+		if (their_ticket && (PRIORITY(their_ticket, they) < my_prio)) {
 			/*
 			 * They have higher priority (lower value). Wait for
 			 * their ticket value to change (either release the lock
@@ -135,13 +133,7 @@ void bakery_lock_get(bakery_lock_t *bakery)
 				bakery_ticket_number(bakery->lock_data[they]));
 		}
 	}
-
-	/*
-	 * Lock acquired. Ensure that any reads and writes from a shared
-	 * resource in the critical section read/write values after the lock is
-	 * acquired.
-	 */
-	dmbish();
+	/* Lock acquired */
 }
 
 
@@ -151,18 +143,13 @@ void bakery_lock_release(bakery_lock_t *bakery)
 	unsigned int me = plat_my_core_pos();
 
 	assert_bakery_entry_valid(me, bakery);
-	assert(bakery_ticket_number(bakery->lock_data[me]) != 0U);
+	assert(bakery_ticket_number(bakery->lock_data[me]));
 
 	/*
-	 * Ensure that other observers see any stores in the critical section
-	 * before releasing the lock. Also ensure all loads in the critical
-	 * section are complete before releasing the lock. Release the lock by
-	 * resetting ticket. Then signal other waiting contenders.
+	 * Release lock by resetting ticket. Then signal other
+	 * waiting contenders
 	 */
-	dmbish();
-	bakery->lock_data[me] = 0U;
-
-	/* Required to ensure ordering of the following sev */
+	bakery->lock_data[me] = 0;
 	dsb();
 	sev();
 }

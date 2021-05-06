@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef PLAT_MACROS_S
-#define PLAT_MACROS_S
+#ifndef __PLAT_MACROS_S__
+#define __PLAT_MACROS_S__
 
 #include <cci_macros.S>
 #include <css_macros.S>
@@ -21,4 +21,4 @@
 	print_cci_regs
 	.endm
 
-#endif /* PLAT_MACROS_S */
+#endif /* __PLAT_MACROS_S__ */

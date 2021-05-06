@@ -1,20 +1,18 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
-#include <arch_features.h>
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
-#include <drivers/generic_delay_timer.h>
-#include <lib/utils_def.h>
-#include <plat/common/platform.h>
+#include <assert.h>
+#include <bl_common.h>
+#include <debug.h>
+#include <delay_timer.h>
+#include <platform.h>
+
+/* Ticks elapsed in one second by a signal of 1 MHz */
+#define MHZ_TICKS_PER_SEC 1000000
 
 static timer_ops_t ops;
 
@@ -43,8 +41,6 @@ void generic_delay_timer_init_args(uint32_t mult, uint32_t div)
 
 void generic_delay_timer_init(void)
 {
-	assert(is_armv7_gentimer_present());
-
 	/* Value in ticks */
 	unsigned int mult = MHZ_TICKS_PER_SEC;
 
@@ -52,9 +48,9 @@ void generic_delay_timer_init(void)
 	unsigned int div  = plat_get_syscnt_freq2();
 
 	/* Reduce multiplier and divider by dividing them repeatedly by 10 */
-	while (((mult % 10U) == 0U) && ((div % 10U) == 0U)) {
-		mult /= 10U;
-		div /= 10U;
+	while ((mult % 10 == 0) && (div % 10 == 0)) {
+		mult /= 10;
+		div /= 10;
 	}
 
 	generic_delay_timer_init_args(mult, div);

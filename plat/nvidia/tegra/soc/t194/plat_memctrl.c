@@ -1,50 +1,44 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2017-2019, NVIDIA CORPORATION. All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
  */
 
 #include <assert.h>
-#include <common/bl_common.h>
+#include <bl_common.h>
 #include <mce.h>
 #include <memctrl_v2.h>
+#include <tegra_mc_def.h>
 #include <tegra_platform.h>
-#include <tegra_private.h>
 
 /*******************************************************************************
- * Array to hold MC context for Tegra194
+ * Struct to hold the memory controller settings
  ******************************************************************************/
-static __attribute__((aligned(16))) mc_regs_t tegra194_mc_context[] = {
-	_START_OF_TABLE_,
-	mc_smmu_bypass_cfg,	/* TBU settings */
-	_END_OF_TABLE_,
+static tegra_mc_settings_t tegra194_mc_settings = {
 };
 
 /*******************************************************************************
- * Handler to return the pointer to the MC's context struct
+ * Handler to return the pointer to the memory controller's settings struct
  ******************************************************************************/
-mc_regs_t *plat_memctrl_get_sys_suspend_ctx(void)
+tegra_mc_settings_t *tegra_get_mc_settings(void)
 {
-	/* index of _END_OF_TABLE_ */
-	tegra194_mc_context[0].val = (uint32_t)ARRAY_SIZE(tegra194_mc_context) - 1U;
-
-	return tegra194_mc_context;
-}
-
-/*******************************************************************************
- * Handler to restore platform specific settings to the memory controller
- ******************************************************************************/
-void plat_memctrl_restore(void)
-{
-	UNUSED_FUNC_NOP(); /* do nothing */
-}
-
-/*******************************************************************************
- * Handler to program platform specific settings to the memory controller
- ******************************************************************************/
-void plat_memctrl_setup(void)
-{
-	UNUSED_FUNC_NOP(); /* do nothing */
+	return &tegra194_mc_settings;
 }
 
 /*******************************************************************************
@@ -54,8 +48,6 @@ void plat_memctrl_setup(void)
 void plat_memctrl_tzdram_setup(uint64_t phys_base, uint64_t size_in_bytes)
 {
 	uint32_t sec_reg_ctrl = tegra_mc_read_32(MC_SECURITY_CFG_REG_CTRL_0);
-	uint32_t phys_base_lo = (uint32_t)phys_base & 0xFFF00000;
-	uint32_t phys_base_hi = (uint32_t)(phys_base >> 32);
 
 	/*
 	 * Check TZDRAM carveout register access status. Setup TZDRAM fence
@@ -70,8 +62,8 @@ void plat_memctrl_tzdram_setup(uint64_t phys_base, uint64_t size_in_bytes)
 		 */
 		INFO("Configuring TrustZone DRAM Memory Carveout\n");
 
-		tegra_mc_write_32(MC_SECURITY_CFG0_0, phys_base_lo);
-		tegra_mc_write_32(MC_SECURITY_CFG3_0, phys_base_hi);
+		tegra_mc_write_32(MC_SECURITY_CFG0_0, (uint32_t)phys_base);
+		tegra_mc_write_32(MC_SECURITY_CFG3_0, (uint32_t)(phys_base >> 32));
 		tegra_mc_write_32(MC_SECURITY_CFG1_0, (uint32_t)(size_in_bytes >> 20));
 
 		/*

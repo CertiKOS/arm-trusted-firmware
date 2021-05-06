@@ -3,16 +3,11 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <platform_def.h>
-
+#include <debug.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-
-#include <dram.h>
+#include <platform_def.h>
 #include <plat_private.h>
-#include <pmu.h>
-#include <pmu_bits.h>
+#include <dram.h>
 #include <pmu_regs.h>
 #include <rk3399_def.h>
 #include <secure.h>
@@ -46,9 +41,6 @@
 #define PRESET_GPIO1_HOLD(n)		(((n) << 8) | WMSK_BIT(8))
 
 #define SYS_COUNTER_FREQ_IN_MHZ		(SYS_COUNTER_FREQ_IN_TICKS / 1000000)
-
-__pmusramdata uint32_t dpll_data[PLL_CON_COUNT];
-__pmusramdata uint32_t cru_clksel_con6;
 
 /*
  * Copy @num registers from @src to @dst
@@ -89,11 +81,10 @@ static __pmusramfunc uint32_t sram_get_timer_value(void)
 
 static __pmusramfunc void sram_udelay(uint32_t usec)
 {
-	uint32_t start, cnt, delta, total_ticks;
+	uint32_t start, cnt, delta, delta_us;
 
 	/* counter is decreasing */
 	start = sram_get_timer_value();
-	total_ticks = usec * SYS_COUNTER_FREQ_IN_MHZ;
 	do {
 		cnt = sram_get_timer_value();
 		if (cnt > start) {
@@ -101,7 +92,8 @@ static __pmusramfunc void sram_udelay(uint32_t usec)
 			delta += start;
 		} else
 			delta = start - cnt;
-	} while (delta <= total_ticks);
+		delta_us = (delta * SYS_COUNTER_FREQ_IN_MHZ);
+	} while (delta_us < usec);
 }
 
 static __pmusramfunc void configure_sgrf(void)
@@ -172,7 +164,7 @@ static __pmusramfunc void override_write_leveling_value(uint32_t ch)
 		mmio_clrsetbits_32(PHY_REG(ch, 8 + (128 * byte)), 0x1 << 16,
 				   1 << 16);
 		mmio_clrsetbits_32(PHY_REG(ch, 63 + (128 * byte)),
-				   0xffffu << 16,
+				   0xffff << 16,
 				   0x200 << 16);
 	}
 
@@ -535,7 +527,7 @@ static __pmusramfunc void pctl_cfg(uint32_t ch,
 
 	for (i = 0; i < 4; i++)
 		sram_regcpy(PHY_REG(ch, 128 * i),
-			    (uintptr_t)&phy_regs->phy0[0], 91);
+			    (uintptr_t)&phy_regs->phy0[i][0], 91);
 
 	for (i = 0; i < 3; i++)
 		sram_regcpy(PHY_REG(ch, 512 + 128 * i),
@@ -643,69 +635,24 @@ static __pmusramfunc int pctl_start(uint32_t channel_mask,
 	return 0;
 }
 
-__pmusramfunc static void pmusram_restore_pll(int pll_id, uint32_t *src)
-{
-	mmio_write_32((CRU_BASE + CRU_PLL_CON(pll_id, 3)), PLL_SLOW_MODE);
-
-	mmio_write_32(CRU_BASE + CRU_PLL_CON(pll_id, 0), src[0] | REG_SOC_WMSK);
-	mmio_write_32(CRU_BASE + CRU_PLL_CON(pll_id, 1), src[1] | REG_SOC_WMSK);
-	mmio_write_32(CRU_BASE + CRU_PLL_CON(pll_id, 2), src[2]);
-	mmio_write_32(CRU_BASE + CRU_PLL_CON(pll_id, 4), src[4] | REG_SOC_WMSK);
-	mmio_write_32(CRU_BASE + CRU_PLL_CON(pll_id, 5), src[5] | REG_SOC_WMSK);
-
-	mmio_write_32(CRU_BASE + CRU_PLL_CON(pll_id, 3), src[3] | REG_SOC_WMSK);
-
-	while ((mmio_read_32(CRU_BASE + CRU_PLL_CON(pll_id, 2)) &
-		(1U << 31)) == 0x0)
-		;
-}
-
-__pmusramfunc static void pmusram_enable_watchdog(void)
-{
-	/* Make the watchdog use the first global reset. */
-	mmio_write_32(CRU_BASE + CRU_GLB_RST_CON, 1 << 1);
-
-	/*
-	 * This gives the system ~8 seconds before reset. The pclk for the
-	 * watchdog is 4MHz on reset. The value of 0x9 in WDT_TORR means that
-	 * the watchdog will wait for 0x1ffffff cycles before resetting.
-	 */
-	mmio_write_32(WDT0_BASE + 4, 0x9);
-
-	/* Enable the watchdog */
-	mmio_setbits_32(WDT0_BASE, 0x1);
-
-	/* Magic reset the watchdog timer value for WDT_CRR. */
-	mmio_write_32(WDT0_BASE + 0xc, 0x76);
-
-	secure_watchdog_ungate();
-
-	/* The watchdog is in PD_ALIVE, so deidle it. */
-	mmio_clrbits_32(PMU_BASE + PMU_BUS_CLR, PMU_CLR_ALIVE);
-}
-
-void dmc_suspend(void)
+void dmc_save(void)
 {
 	struct rk3399_sdram_params *sdram_params = &sdram_config;
 	struct rk3399_ddr_publ_regs *phy_regs;
 	uint32_t *params_ctl;
 	uint32_t *params_pi;
 	uint32_t refdiv, postdiv2, postdiv1, fbdiv;
-	uint32_t ch, byte, i;
+	uint32_t tmp, ch, byte, i;
 
 	phy_regs = &sdram_params->phy_regs;
 	params_ctl = sdram_params->pctl_regs.denali_ctl;
 	params_pi = sdram_params->pi_regs.denali_pi;
 
-	/* save dpll register and ddr clock register value to pmusram */
-	cru_clksel_con6 = mmio_read_32(CRU_BASE + CRU_CLKSEL_CON6);
-	for (i = 0; i < PLL_CON_COUNT; i++)
-		dpll_data[i] = mmio_read_32(CRU_BASE + CRU_PLL_CON(DPLL_ID, i));
-
-	fbdiv = dpll_data[0] & 0xfff;
-	postdiv2 = POSTDIV2_DEC(dpll_data[1]);
-	postdiv1 = POSTDIV1_DEC(dpll_data[1]);
-	refdiv = REFDIV_DEC(dpll_data[1]);
+	fbdiv = mmio_read_32(CRU_BASE + CRU_PLL_CON(DPLL_ID, 0)) & 0xfff;
+	tmp = mmio_read_32(CRU_BASE + CRU_PLL_CON(DPLL_ID, 1));
+	postdiv2 = POSTDIV2_DEC(tmp);
+	postdiv1 = POSTDIV1_DEC(tmp);
+	refdiv = REFDIV_DEC(tmp);
 
 	sdram_params->ddr_freq = ((fbdiv * 24) /
 				(refdiv * postdiv1 * postdiv2)) * MHz;
@@ -726,8 +673,9 @@ void dmc_suspend(void)
 	/* mask DENALI_PI_00_DATA.START, only copy here, will trigger later*/
 	params_pi[0] &= ~(0x1 << 0);
 
-	dram_regcpy((uintptr_t)&phy_regs->phy0[0],
-			    PHY_REG(0, 0), 91);
+	for (i = 0; i < 4; i++)
+		dram_regcpy((uintptr_t)&phy_regs->phy0[i][0],
+			    PHY_REG(0, 128 * i), 91);
 
 	for (i = 0; i < 3; i++)
 		dram_regcpy((uintptr_t)&phy_regs->phy512[i][0],
@@ -748,24 +696,11 @@ void dmc_suspend(void)
 	phy_regs->phy896[0] &= ~(0x3 << 8);
 }
 
-__pmusramfunc void dmc_resume(void)
+__pmusramfunc void dmc_restore(void)
 {
 	struct rk3399_sdram_params *sdram_params = &sdram_config;
 	uint32_t channel_mask = 0;
 	uint32_t channel;
-
-	pmusram_enable_watchdog();
-	pmu_sgrf_rst_hld_release();
-	restore_pmu_rsthold();
-	sram_secure_timer_init();
-
-	/*
-	 * we switch ddr clock to abpll when suspend,
-	 * we set back to dpll here
-	 */
-	mmio_write_32(CRU_BASE + CRU_CLKSEL_CON6,
-			cru_clksel_con6 | REG_SOC_WMSK);
-	pmusram_restore_pll(DPLL_ID, dpll_data);
 
 	configure_sgrf();
 

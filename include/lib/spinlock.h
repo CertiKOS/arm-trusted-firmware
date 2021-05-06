@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SPINLOCK_H
-#define SPINLOCK_H
+#ifndef __SPINLOCK_H__
+#define __SPINLOCK_H__
 
-#ifndef __ASSEMBLER__
+#ifndef __ASSEMBLY__
 
-#include <stdint.h>
+#include <types.h>
 
 typedef struct spinlock {
 	volatile uint32_t lock;
@@ -26,4 +26,4 @@ void spin_unlock(spinlock_t *lock);
 
 #endif
 
-#endif /* SPINLOCK_H */
+#endif /* __SPINLOCK_H__ */

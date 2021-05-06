@@ -1,30 +1,25 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch_helpers.h>
 #include <assert.h>
-#include <cortex_a57.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/interrupt_props.h>
-#include <drivers/console.h>
-#include <lib/xlat_tables/xlat_tables_v2.h>
-#include <drivers/arm/gic_common.h>
-#include <drivers/arm/gicv2.h>
-#include <bl31/interrupt_mgmt.h>
-
+#include <bl_common.h>
 #include <bpmp.h>
+#include <console.h>
+#include <cortex_a57.h>
+#include <debug.h>
 #include <flowctrl.h>
+#include <interrupt_mgmt.h>
 #include <memctrl.h>
-#include <plat/common/platform.h>
+#include <platform.h>
 #include <security_engine.h>
 #include <tegra_def.h>
-#include <tegra_platform.h>
 #include <tegra_private.h>
+#include <tegra_platform.h>
+#include <xlat_tables_v2.h>
 
 /* sets of MMIO ranges setup */
 #define MMIO_RANGE_0_ADDR	0x50000000
@@ -115,36 +110,20 @@ static uint32_t tegra210_uart_addresses[TEGRA210_MAX_UART_PORTS + 1] = {
 };
 
 /*******************************************************************************
- * Enable console corresponding to the console ID
+ * Retrieve the UART controller base to be used as the console
  ******************************************************************************/
-void plat_enable_console(int32_t id)
+uint32_t plat_get_console_from_id(int id)
 {
-	static console_t uart_console;
-	uint32_t console_clock;
+	if (id > TEGRA210_MAX_UART_PORTS)
+		return 0;
 
-	if ((id > 0) && (id < TEGRA210_MAX_UART_PORTS)) {
-		/*
-		 * Reference clock used by the FPGAs is a lot slower.
-		 */
-		if (tegra_platform_is_fpga()) {
-			console_clock = TEGRA_BOOT_UART_CLK_13_MHZ;
-		} else {
-			console_clock = TEGRA_BOOT_UART_CLK_408_MHZ;
-		}
-
-		(void)console_16550_register(tegra210_uart_addresses[id],
-					     console_clock,
-					     TEGRA_CONSOLE_BAUDRATE,
-					     &uart_console);
-		console_set_scope(&uart_console, CONSOLE_FLAG_BOOT |
-			CONSOLE_FLAG_RUNTIME | CONSOLE_FLAG_CRASH);
-	}
+	return tegra210_uart_addresses[id];
 }
 
 /*******************************************************************************
  * Return pointer to the BL31 params from previous bootloader
  ******************************************************************************/
-struct tegra_bl31_params *plat_get_bl31_params(void)
+bl31_params_t *plat_get_bl31_params(void)
 {
 	return NULL;
 }
@@ -165,15 +144,6 @@ void plat_early_platform_setup(void)
 	const plat_params_from_bl2_t *plat_params = bl31_get_plat_params();
 	uint64_t val;
 
-	/* Verify chip id is t210 */
-	assert(tegra_chipid_is_t210());
-
-	/*
-	 * Do initial security configuration to allow DRAM/device access.
-	 */
-	tegra_memctrl_tzdram_setup(plat_params->tzdram_base,
-			(uint32_t)plat_params->tzdram_size);
-
 	/* platform parameter passed by the previous bootloader */
 	if (plat_params->l2_ecc_parity_prot_dis != 1) {
 		/* Enable ECC Parity Protection for Cortex-A57 CPUs */
@@ -185,16 +155,6 @@ void plat_early_platform_setup(void)
 	/* Initialize security engine driver */
 	tegra_se_init();
 }
-
-/* Secure IRQs for Tegra186 */
-static const interrupt_prop_t tegra210_interrupt_props[] = {
-	INTR_PROP_DESC(TEGRA_SDEI_SGI_PRIVATE, PLAT_SDEI_CRITICAL_PRI,
-			GICV2_INTR_GROUP0, GIC_INTR_CFG_EDGE),
-	INTR_PROP_DESC(TEGRA210_TIMER1_IRQ, PLAT_TEGRA_WDT_PRIO,
-			GICV2_INTR_GROUP0, GIC_INTR_CFG_EDGE),
-	INTR_PROP_DESC(TEGRA210_WDT_CPU_LEGACY_FIQ, PLAT_TEGRA_WDT_PRIO,
-			GICV2_INTR_GROUP0, GIC_INTR_CFG_EDGE),
-};
 
 /*******************************************************************************
  * Handler for late platform setup
@@ -241,11 +201,6 @@ void plat_late_platform_setup(void)
 				plat_params->sc7entry_fw_size,
 				MT_SECURE | MT_RO_DATA);
 		assert(ret == 0);
-
-		/* restrict PMC access to secure world */
-		val = mmio_read_32(TEGRA_MISC_BASE + APB_SLAVE_SECURITY_ENABLE);
-		val |= PMC_SECURITY_EN_BIT;
-		mmio_write_32(TEGRA_MISC_BASE + APB_SLAVE_SECURITY_ENABLE, val);
 	}
 
 	if (!tegra_chipid_is_t210_b01()) {
@@ -256,22 +211,52 @@ void plat_late_platform_setup(void)
 	}
 }
 
+/* Secure IRQs for Tegra210 */
+static const irq_sec_cfg_t tegra210_sec_irqs[] = {
+	{
+		TEGRA210_TIMER1_IRQ,
+		0x1, /* CPU0 */
+		INTR_TYPE_S_EL1,
+	},
+	{
+		TEGRA210_WDT_CPU_IPI,
+		TEGRA210_SEC_IRQ_TARGET_MASK,
+		INTR_TYPE_EL3,
+	},
+	{
+		TEGRA210_WDT_CPU_LEGACY_FIQ,
+		TEGRA210_SEC_IRQ_TARGET_MASK,
+		INTR_TYPE_EL3,
+	},
+};
+
 /*******************************************************************************
  * Initialize the GIC and SGIs
  ******************************************************************************/
 void plat_gic_setup(void)
 {
-	tegra_gic_setup(tegra210_interrupt_props, ARRAY_SIZE(tegra210_interrupt_props));
-	tegra_gic_init();
-
-	/* Enable handling for FIQs */
-	tegra_fiq_handler_setup();
+	tegra_gic_cfg_t tegra210_gic_cfg = {0};
 
 	/*
-	 * Enable routing watchdog FIQs from the flow controller to
-	 * the GICD.
+	 * Initialize the FIQ handler only if the platform supports any
+	 * FIQ interrupt sources.
 	 */
-	tegra_fc_enable_fiq_to_ccplex_routing();
+	if (ARRAY_SIZE(tegra210_sec_irqs) > 0) {
+
+		/* Configure platform FIQs */
+		tegra210_gic_cfg.irq_cfg = tegra210_sec_irqs;
+		tegra210_gic_cfg.g0_int_num = ARRAY_SIZE(tegra210_sec_irqs);
+		tegra_gic_setup(&tegra210_gic_cfg);
+
+		/* Enable handling for FIQs */
+		tegra_fiq_handler_setup();
+
+		/*
+		 * Enable routing watchdog FIQs from the flow controller to
+		 * the GICD.
+		 */
+		tegra_fc_enable_fiq_to_ccplex_routing();
+	}
 }
 /*******************************************************************************
  * Handler to indicate support for System Suspend
@@ -290,29 +275,4 @@ bool plat_supports_system_suspend(void)
 	} else {
 		return false;
 	}
-}
-/*******************************************************************************
- * Platform specific runtime setup.
- ******************************************************************************/
-void plat_runtime_setup(void)
-{
-	/*
-	 * During cold boot, it is observed that the arbitration
-	 * bit is set in the Memory controller leading to false
-	 * error interrupts in the non-secure world. To avoid
-	 * this, clean the interrupt status register before
-	 * booting into the non-secure world
-	 */
-	tegra_memctrl_clear_pending_interrupts();
-
-	/*
-	 * During boot, USB3 and flash media (SDMMC/SATA) devices need
-	 * access to IRAM. Because these clients connect to the MC and
-	 * do not have a direct path to the IRAM, the MC implements AHB
-	 * redirection during boot to allow path to IRAM. In this mode
-	 * accesses to a programmed memory address aperture are directed
-	 * to the AHB bus, allowing access to the IRAM. This mode must be
-	 * disabled before we jump to the non-secure world.
-	 */
-	tegra_memctrl_disable_ahb_redirection();
 }

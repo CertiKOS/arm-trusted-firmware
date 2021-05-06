@@ -5,23 +5,27 @@
  */
 
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <lib/utils.h>
-#include <plat/common/plat_trng.h>
-#include <platform_def.h>
+#include <debug.h>
+#include <utils.h>
+#include "juno_decl.h"
+#include "juno_def.h"
 
 u_register_t plat_get_stack_protector_canary(void)
 {
-	uint64_t entropy;
+	u_register_t c[TRNG_NBYTES / sizeof(u_register_t)];
+	u_register_t ret = 0;
+	size_t i;
 
-	if (!plat_get_entropy(&entropy)) {
+	if (juno_getentropy(c, sizeof(c)) != 0) {
 		ERROR("Not enough entropy to initialize canary value\n");
 		panic();
 	}
 
-	if (sizeof(entropy) == sizeof(u_register_t)) {
-		return entropy;
-	}
-
-	return (entropy & 0xffffffffULL) ^ (entropy >> 32);
+	/*
+	 * On Juno we get 128-bits of entropy in one round.
+	 * Fuse the values together to form the canary.
+	 */
+	for (i = 0; i < ARRAY_SIZE(c); i++)
+		ret ^= c[i];
+	return ret;
 }

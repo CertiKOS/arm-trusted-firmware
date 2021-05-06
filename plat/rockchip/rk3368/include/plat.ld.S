@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef ROCKCHIP_PLAT_LD_S
-#define ROCKCHIP_PLAT_LD_S
+#ifndef __ROCKCHIP_PLAT_LD_S__
+#define __ROCKCHIP_PLAT_LD_S__
 
 MEMORY {
     PMUSRAM (rwx): ORIGIN = PMUSRAM_BASE, LENGTH = PMUSRAM_RSIZE
@@ -34,4 +34,4 @@ SECTIONS
 	} >PMUSRAM
 }
 
-#endif /* ROCKCHIP_PLAT_LD_S */
+#endif /* __ROCKCHIP_PLAT_LD_S__ */

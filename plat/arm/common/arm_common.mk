@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -7,10 +7,9 @@
 ifeq (${ARCH}, aarch64)
   # On ARM standard platorms, the TSP can execute from Trusted SRAM, Trusted
   # DRAM (if available) or the TZC secured area of DRAM.
-  # TZC secured DRAM is the default.
+  # Trusted SRAM is the default.
 
-  ARM_TSP_RAM_LOCATION	?=	dram
-
+  ARM_TSP_RAM_LOCATION	:=	tsram
   ifeq (${ARM_TSP_RAM_LOCATION}, tsram)
     ARM_TSP_RAM_LOCATION_ID = ARM_TRUSTED_SRAM_ID
   else ifeq (${ARM_TSP_RAM_LOCATION}, tdram)
@@ -22,16 +21,13 @@ ifeq (${ARCH}, aarch64)
   endif
 
   # Process flags
+  $(eval $(call add_define,ARM_TSP_RAM_LOCATION_ID))
+
   # Process ARM_BL31_IN_DRAM flag
   ARM_BL31_IN_DRAM		:=	0
   $(eval $(call assert_boolean,ARM_BL31_IN_DRAM))
   $(eval $(call add_define,ARM_BL31_IN_DRAM))
-else
-  ARM_TSP_RAM_LOCATION_ID = ARM_TRUSTED_SRAM_ID
 endif
-
-$(eval $(call add_define,ARM_TSP_RAM_LOCATION_ID))
-
 
 # For the original power-state parameter format, the State-ID can be encoded
 # according to the recommended encoding or zero. This flag determines which
@@ -80,111 +76,33 @@ ARM_XLAT_TABLES_LIB_V1		:=	0
 $(eval $(call assert_boolean,ARM_XLAT_TABLES_LIB_V1))
 $(eval $(call add_define,ARM_XLAT_TABLES_LIB_V1))
 
-# Don't have the Linux kernel as a BL33 image by default
-ARM_LINUX_KERNEL_AS_BL33	:=	0
-$(eval $(call assert_boolean,ARM_LINUX_KERNEL_AS_BL33))
-$(eval $(call add_define,ARM_LINUX_KERNEL_AS_BL33))
-
-ifeq (${ARM_LINUX_KERNEL_AS_BL33},1)
-  ifneq (${ARCH},aarch64)
-    ifneq (${RESET_TO_SP_MIN},1)
-      $(error "ARM_LINUX_KERNEL_AS_BL33 is only available if RESET_TO_SP_MIN=1.")
-    endif
-  endif
-  ifndef PRELOADED_BL33_BASE
-    $(error "PRELOADED_BL33_BASE must be set if ARM_LINUX_KERNEL_AS_BL33 is used.")
-  endif
-  ifndef ARM_PRELOADED_DTB_BASE
-    $(error "ARM_PRELOADED_DTB_BASE must be set if ARM_LINUX_KERNEL_AS_BL33 is used.")
-  endif
-  $(eval $(call add_define,ARM_PRELOADED_DTB_BASE))
-endif
-
-# Arm Ethos-N NPU SiP service
-ARM_ETHOSN_NPU_DRIVER			:=	0
-$(eval $(call assert_boolean,ARM_ETHOSN_NPU_DRIVER))
-$(eval $(call add_define,ARM_ETHOSN_NPU_DRIVER))
-
 # Use an implementation of SHA-256 with a smaller memory footprint but reduced
 # speed.
 $(eval $(call add_define,MBEDTLS_SHA256_SMALLER))
-
-# Add the build options to pack Trusted OS Extra1 and Trusted OS Extra2 images
-# in the FIP if the platform requires.
-ifneq ($(BL32_EXTRA1),)
-$(eval $(call TOOL_ADD_IMG,bl32_extra1,--tos-fw-extra1))
-endif
-ifneq ($(BL32_EXTRA2),)
-$(eval $(call TOOL_ADD_IMG,bl32_extra2,--tos-fw-extra2))
-endif
 
 # Enable PSCI_STAT_COUNT/RESIDENCY APIs on ARM platforms
 ENABLE_PSCI_STAT		:=	1
 ENABLE_PMF			:=	1
 
-# Override the standard libc with optimised libc_asm
-OVERRIDE_LIBC			:=	1
-ifeq (${OVERRIDE_LIBC},1)
-    include lib/libc/libc_asm.mk
-endif
-
 # On ARM platforms, separate the code and read-only data sections to allow
 # mapping the former as executable and the latter as execute-never.
 SEPARATE_CODE_AND_RODATA	:=	1
 
-# On ARM platforms, disable SEPARATE_NOBITS_REGION by default. Both PROGBITS
-# and NOBITS sections of BL31 image are adjacent to each other and loaded
-# into Trusted SRAM.
-SEPARATE_NOBITS_REGION		:=	0
+# Enable new version of image loading on ARM platforms
+LOAD_IMAGE_V2			:=	1
 
-# In order to support SEPARATE_NOBITS_REGION for Arm platforms, we need to load
-# BL31 PROGBITS into secure DRAM space and BL31 NOBITS into SRAM. Hence mandate
-# the build to require that ARM_BL31_IN_DRAM is enabled as well.
-ifeq ($(SEPARATE_NOBITS_REGION),1)
-    ifneq ($(ARM_BL31_IN_DRAM),1)
-         $(error For SEPARATE_NOBITS_REGION, ARM_BL31_IN_DRAM must be enabled)
-    endif
-    ifneq ($(RECLAIM_INIT_CODE),0)
-          $(error For SEPARATE_NOBITS_REGION, RECLAIM_INIT_CODE cannot be supported)
-    endif
-endif
+# Use generic OID definition (tbbr_oid.h)
+USE_TBBR_DEFS			:=	1
 
-# Disable ARM Cryptocell by default
-ARM_CRYPTOCELL_INTEG		:=	0
-$(eval $(call assert_boolean,ARM_CRYPTOCELL_INTEG))
-$(eval $(call add_define,ARM_CRYPTOCELL_INTEG))
-
-# Enable PIE support for RESET_TO_BL31 case
-ifeq (${RESET_TO_BL31},1)
-    ENABLE_PIE			:=	1
-endif
-
-# CryptoCell integration relies on coherent buffers for passing data from
-# the AP CPU to the CryptoCell
-ifeq (${ARM_CRYPTOCELL_INTEG},1)
-    ifeq (${USE_COHERENT_MEM},0)
-        $(error "ARM_CRYPTOCELL_INTEG needs USE_COHERENT_MEM to be set.")
-    endif
-endif
-
-# Disable GPT parser support, use FIP image by default
-ARM_GPT_SUPPORT			:=	0
-$(eval $(call assert_boolean,ARM_GPT_SUPPORT))
-$(eval $(call add_define,ARM_GPT_SUPPORT))
-
-# Include necessary sources to parse GPT image
-ifeq (${ARM_GPT_SUPPORT}, 1)
-  BL2_SOURCES	+=	drivers/partition/gpt.c		\
-			drivers/partition/partition.c
-endif
+PLAT_INCLUDES		+=	-Iinclude/common/tbbr				\
+				-Iinclude/plat/arm/common
 
 ifeq (${ARCH}, aarch64)
 PLAT_INCLUDES		+=	-Iinclude/plat/arm/common/aarch64
 endif
 
 PLAT_BL_COMMON_SOURCES	+=	plat/arm/common/${ARCH}/arm_helpers.S		\
-				plat/arm/common/arm_common.c			\
-				plat/arm/common/arm_console.c
+				plat/arm/common/arm_common.c
 
 ifeq (${ARM_XLAT_TABLES_LIB_V1}, 1)
 PLAT_BL_COMMON_SOURCES	+=	lib/xlat_tables/xlat_tables_common.c		\
@@ -195,54 +113,24 @@ include lib/xlat_tables_v2/xlat_tables.mk
 PLAT_BL_COMMON_SOURCES	+=	${XLAT_TABLES_LIB_SRCS}
 endif
 
-ARM_IO_SOURCES		+=	plat/arm/common/arm_io_storage.c		\
-				plat/arm/common/fconf/arm_fconf_io.c
-ifeq (${SPD},spmd)
-    ifeq (${SPMD_SPM_AT_SEL2},1)
-         ARM_IO_SOURCES		+=	plat/arm/common/fconf/arm_fconf_sp.c
-    endif
-endif
-
-BL1_SOURCES		+=	drivers/io/io_fip.c				\
+BL1_SOURCES		+=	drivers/arm/sp805/sp805.c			\
+				drivers/io/io_fip.c				\
 				drivers/io/io_memmap.c				\
 				drivers/io/io_storage.c				\
 				plat/arm/common/arm_bl1_setup.c			\
-				plat/arm/common/arm_err.c			\
-				${ARM_IO_SOURCES}
-
+				plat/arm/common/arm_io_storage.c
 ifdef EL3_PAYLOAD_BASE
-# Need the plat_arm_program_trusted_mailbox() function to release secondary CPUs from
+# Need the arm_program_trusted_mailbox() function to release secondary CPUs from
 # their holding pen
 BL1_SOURCES		+=	plat/arm/common/arm_pm.c
 endif
 
-BL2_SOURCES		+=	drivers/delay_timer/delay_timer.c		\
-				drivers/delay_timer/generic_delay_timer.c	\
-				drivers/io/io_fip.c				\
+BL2_SOURCES		+=	drivers/io/io_fip.c				\
 				drivers/io/io_memmap.c				\
 				drivers/io/io_storage.c				\
 				plat/arm/common/arm_bl2_setup.c			\
-				plat/arm/common/arm_err.c			\
-				${ARM_IO_SOURCES}
-
-# Firmware Configuration Framework sources
-include lib/fconf/fconf.mk
-
-# Add `libfdt` and Arm common helpers required for Dynamic Config
-include lib/libfdt/libfdt.mk
-
-DYN_CFG_SOURCES		+=	plat/arm/common/arm_dyn_cfg.c		\
-				plat/arm/common/arm_dyn_cfg_helpers.c	\
-				common/fdt_wrappers.c			\
-				common/uuid.c
-
-BL1_SOURCES		+=	${DYN_CFG_SOURCES}
-BL2_SOURCES		+=	${DYN_CFG_SOURCES}
-
-ifeq (${BL2_AT_EL3},1)
-BL2_SOURCES		+=	plat/arm/common/arm_bl2_el3_setup.c
-endif
-
+				plat/arm/common/arm_io_storage.c
+ifeq (${LOAD_IMAGE_V2},1)
 # Because BL1/BL2 execute in AArch64 mode but BL32 in AArch32 we need to use
 # the AArch32 descriptors.
 ifeq (${JUNO_AARCH32_EL3_RUNTIME},1)
@@ -252,96 +140,33 @@ BL2_SOURCES		+=	plat/arm/common/${ARCH}/arm_bl2_mem_params_desc.c
 endif
 BL2_SOURCES		+=	plat/arm/common/arm_image_load.c		\
 				common/desc_image_load.c
-ifeq (${SPD},opteed)
-BL2_SOURCES		+=	lib/optee/optee_utils.c
 endif
 
-BL2U_SOURCES		+=	drivers/delay_timer/delay_timer.c		\
-				drivers/delay_timer/generic_delay_timer.c	\
-				plat/arm/common/arm_bl2u_setup.c
+BL2U_SOURCES		+=	plat/arm/common/arm_bl2u_setup.c
 
 BL31_SOURCES		+=	plat/arm/common/arm_bl31_setup.c		\
 				plat/arm/common/arm_pm.c			\
 				plat/arm/common/arm_topology.c			\
+				plat/arm/common/execution_state_switch.c	\
 				plat/common/plat_psci_common.c
 
-ifneq ($(filter 1,${ENABLE_PMF} ${ARM_ETHOSN_NPU_DRIVER}),)
-ARM_SVC_HANDLER_SRCS :=
-
-ifeq (${ENABLE_PMF},1)
-ARM_SVC_HANDLER_SRCS	+=	lib/pmf/pmf_smc.c
-endif
-
-ifeq (${ARM_ETHOSN_NPU_DRIVER},1)
-ARM_SVC_HANDLER_SRCS	+=	plat/arm/common/fconf/fconf_ethosn_getter.c	\
-				drivers/delay_timer/delay_timer.c		\
-				drivers/arm/ethosn/ethosn_smc.c
-endif
-
-ifeq (${ARCH}, aarch64)
-BL31_SOURCES		+=	plat/arm/common/aarch64/execution_state_switch.c\
-				plat/arm/common/arm_sip_svc.c			\
-				${ARM_SVC_HANDLER_SRCS}
-else
-BL32_SOURCES		+=	plat/arm/common/arm_sip_svc.c			\
-				${ARM_SVC_HANDLER_SRCS}
-endif
-endif
-
-ifeq (${EL3_EXCEPTION_HANDLING},1)
-BL31_SOURCES		+=	plat/common/aarch64/plat_ehf.c
-endif
-
-ifeq (${SDEI_SUPPORT},1)
-BL31_SOURCES		+=	plat/arm/common/aarch64/arm_sdei.c
-ifeq (${SDEI_IN_FCONF},1)
-BL31_SOURCES		+=	plat/arm/common/fconf/fconf_sdei_getter.c
-endif
-endif
-
-# RAS sources
-ifeq (${RAS_EXTENSION},1)
-BL31_SOURCES		+=	lib/extensions/ras/std_err_record.c		\
-				lib/extensions/ras/ras_common.c
-endif
-
-# Pointer Authentication sources
-ifeq (${ENABLE_PAUTH}, 1)
-PLAT_BL_COMMON_SOURCES	+=	plat/arm/common/aarch64/arm_pauth.c	\
-				lib/extensions/pauth/pauth_helpers.S
-endif
-
-ifeq (${SPD},spmd)
-BL31_SOURCES		+=	plat/common/plat_spmd_manifest.c	\
-				common/fdt_wrappers.c			\
-				common/uuid.c				\
-				${LIBFDT_SRCS}
-
+ifeq (${ENABLE_PMF}, 1)
+BL31_SOURCES		+=	plat/arm/common/arm_sip_svc.c			\
+				lib/pmf/pmf_smc.c
 endif
 
 ifneq (${TRUSTED_BOARD_BOOT},0)
+
+    # By default, ARM platforms use RSA keys
+    KEY_ALG		:=	rsa
 
     # Include common TBB sources
     AUTH_SOURCES	:=	drivers/auth/auth_mod.c				\
 				drivers/auth/crypto_mod.c			\
 				drivers/auth/img_parser_mod.c			\
-				lib/fconf/fconf_tbbr_getter.c
+				drivers/auth/tbbr/tbbr_cot.c			\
 
-    # Include the selected chain of trust sources.
-    ifeq (${COT},tbbr)
-	BL1_SOURCES     +=      drivers/auth/tbbr/tbbr_cot_common.c		\
-				drivers/auth/tbbr/tbbr_cot_bl1.c
-        ifneq (${COT_DESC_IN_DTB},0)
-            BL2_SOURCES	+=	lib/fconf/fconf_cot_getter.c
-        else
-            BL2_SOURCES	+=	drivers/auth/tbbr/tbbr_cot_common.c	\
-				drivers/auth/tbbr/tbbr_cot_bl2.c
-        endif
-    else ifeq (${COT},dualroot)
-        AUTH_SOURCES	+=	drivers/auth/dualroot/cot.c
-    else
-        $(error Unknown chain of trust ${COT})
-    endif
+    PLAT_INCLUDES	+=	-Iinclude/bl1/tbbr
 
     BL1_SOURCES		+=	${AUTH_SOURCES}					\
 				bl1/tbbr/tbbr_img_desc.c			\
@@ -351,14 +176,12 @@ ifneq (${TRUSTED_BOARD_BOOT},0)
     BL2_SOURCES		+=	${AUTH_SOURCES}					\
 				plat/common/tbbr/plat_tbbr.c
 
-    $(eval $(call TOOL_ADD_IMG,ns_bl2u,--fwu,FWU_))
+    $(eval $(call FWU_FIP_ADD_IMG,NS_BL2U,--fwu))
+
+    TF_MBEDTLS_KEY_ALG	:=	${KEY_ALG}
 
     # We expect to locate the *.mk files under the directories specified below
-ifeq (${ARM_CRYPTOCELL_INTEG},0)
     CRYPTO_LIB_MK := drivers/auth/mbedtls/mbedtls_crypto.mk
-else
-    CRYPTO_LIB_MK := drivers/auth/cryptocell/cryptocell_crypto.mk
-endif
     IMG_PARSER_LIB_MK := drivers/auth/mbedtls/mbedtls_x509.mk
 
     $(info Including ${CRYPTO_LIB_MK})
@@ -367,16 +190,4 @@ endif
     $(info Including ${IMG_PARSER_LIB_MK})
     include ${IMG_PARSER_LIB_MK}
 
-endif
-
-ifeq (${RECLAIM_INIT_CODE}, 1)
-    ifeq (${ARM_XLAT_TABLES_LIB_V1}, 1)
-        $(error "To reclaim init code xlat tables v2 must be used")
-    endif
-endif
-
-ifeq (${MEASURED_BOOT},1)
-    MEASURED_BOOT_MK := drivers/measured_boot/measured_boot.mk
-    $(info Including ${MEASURED_BOOT_MK})
-    include ${MEASURED_BOOT_MK}
 endif

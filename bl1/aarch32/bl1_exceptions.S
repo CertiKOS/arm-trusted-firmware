@@ -6,12 +6,12 @@
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <bl1/bl1.h>
-#include <common/bl_common.h>
+#include <bl1.h>
+#include <bl_common.h>
 #include <context.h>
-#include <lib/xlat_tables/xlat_tables.h>
 #include <smccc_helpers.h>
 #include <smccc_macros.S>
+#include <xlat_tables.h>
 
 	.globl	bl1_aarch32_smc_handler
 
@@ -71,16 +71,11 @@ debug_loop:
 	 */
 	ldr	lr, [r8, #ENTRY_POINT_INFO_PC_OFFSET]
 	ldr	r1, [r8, #(ENTRY_POINT_INFO_PC_OFFSET + 4)]
-	msr	spsr_xc, r1
-
-	/* Some BL32 stages expect lr_svc to provide the BL33 entry address */
-	cps	#MODE32_svc
-	ldr	lr, [r8, #ENTRY_POINT_INFO_LR_SVC_OFFSET]
-	cps	#MODE32_mon
+	msr	spsr, r1
 
 	add	r8, r8, #ENTRY_POINT_INFO_ARGS_OFFSET
 	ldm	r8, {r0, r1, r2, r3}
-	exception_return
+	eret
 endfunc bl1_aarch32_smc_handler
 
 	/* -----------------------------------------------------
@@ -116,7 +111,7 @@ func smc_handler
 
 	/* Turn on the MMU */
 	mov	r0, #DISABLE_DCACHE
-	bl	enable_mmu_svc_mon
+	bl	enable_mmu_secure
 
 	/* Enable the data cache. */
 	ldcopr	r9, SCTLR

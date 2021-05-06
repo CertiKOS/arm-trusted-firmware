@@ -5,23 +5,18 @@
  */
 
 #include <assert.h>
+#include <debug.h>
 #include <errno.h>
+#include <gpt.h>
 #include <string.h>
-
-#include <common/debug.h>
-#include <drivers/partition/gpt.h>
-#include <lib/utils.h>
+#include <utils.h>
 
 static int unicode_to_ascii(unsigned short *str_in, unsigned char *str_out)
 {
-	uint8_t *name;
+	uint8_t *name = (uint8_t *)str_in;
 	int i;
 
-	assert((str_in != NULL) && (str_out != NULL));
-
-	name = (uint8_t *)str_in;
-
-	assert(name[0] != '\0');
+	assert((str_in != NULL) && (str_out != NULL) && (name[0] != '\0'));
 
 	/* check whether the unicode string is valid */
 	for (i = 1; i < (EFI_NAMELEN << 1); i += 2) {
@@ -41,7 +36,7 @@ int parse_gpt_entry(gpt_entry_t *gpt_entry, partition_entry_t *entry)
 {
 	int result;
 
-	assert((gpt_entry != NULL) && (entry != NULL));
+	assert((gpt_entry != 0) && (entry != 0));
 
 	if ((gpt_entry->first_lba == 0) && (gpt_entry->last_lba == 0)) {
 		return -EINVAL;
@@ -52,10 +47,9 @@ int parse_gpt_entry(gpt_entry_t *gpt_entry, partition_entry_t *entry)
 	if (result != 0) {
 		return result;
 	}
-	entry->start = (uint64_t)gpt_entry->first_lba *
-		       PLAT_PARTITION_BLOCK_SIZE;
+	entry->start = (uint64_t)gpt_entry->first_lba * PARTITION_BLOCK_SIZE;
 	entry->length = (uint64_t)(gpt_entry->last_lba -
 				   gpt_entry->first_lba + 1) *
-			PLAT_PARTITION_BLOCK_SIZE;
+			PARTITION_BLOCK_SIZE;
 	return 0;
 }

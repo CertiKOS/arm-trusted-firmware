@@ -1,21 +1,20 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <stdint.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/io/io_block.h>
-#include <lib/mmio.h>
-#include <lib/utils_def.h>
+#include <debug.h>
+#include <io/io_block.h>
+#include <mmio.h>
+#include <platform_def.h>
+#include <sys/types.h>
+#include <utils_def.h>
 
 #include "uniphier.h"
+
+#define DIV_ROUND_UP(n, d)	(((n) + (d) - 1) / (d))
 
 #define NAND_CMD_READ0		0
 #define NAND_CMD_READSTART	0x30
@@ -109,7 +108,7 @@ static int uniphier_nand_block_isbad(struct uniphier_nand *nand, int block)
 
 	/* if possible, save the result for future re-use */
 	if (block < ARRAY_SIZE(nand->bbt))
-		nand->bbt[block] = is_bad;
+	    nand->bbt[block] = is_bad;
 
 	if (is_bad)
 		WARN("found bad block at %d. skip.\n", block);
@@ -165,7 +164,7 @@ static size_t __uniphier_nand_read(struct uniphier_nand *nand, int lba,
 	int pages_per_block = nand->pages_per_block;
 	int page_size = nand->page_size;
 	int blocks_to_skip = lba / pages_per_block;
-	int pages_to_read = div_round_up(size, page_size);
+	int pages_to_read = DIV_ROUND_UP(size, page_size);
 	int page = lba % pages_per_block;
 	int block = 0;
 	uintptr_t p = buf;
@@ -225,6 +224,10 @@ static size_t uniphier_nand_read(int lba, uintptr_t buf, size_t size)
 }
 
 static struct io_block_dev_spec uniphier_nand_dev_spec = {
+	.buffer = {
+		.offset = UNIPHIER_BLOCK_BUF_BASE,
+		.length = UNIPHIER_BLOCK_BUF_SIZE,
+	},
 	.ops = {
 		.read = uniphier_nand_read,
 	},
@@ -238,7 +241,8 @@ static int uniphier_nand_hw_init(struct uniphier_nand *nand)
 	for (i = 0; i < ARRAY_SIZE(nand->bbt); i++)
 		nand->bbt[i] = UNIPHIER_NAND_BBT_UNKNOWN;
 
-	nand->reg_base = nand->host_base + 0x100000;
+	nand->host_base = 0x68000000;
+	nand->reg_base = 0x68100000;
 
 	nand->pages_per_block =
 			mmio_read_32(nand->reg_base + DENALI_PAGES_PER_BLOCK);
@@ -255,21 +259,9 @@ static int uniphier_nand_hw_init(struct uniphier_nand *nand)
 	return 0;
 }
 
-static const uintptr_t uniphier_nand_base[] = {
-	[UNIPHIER_SOC_LD11] = 0x68000000,
-	[UNIPHIER_SOC_LD20] = 0x68000000,
-	[UNIPHIER_SOC_PXS3] = 0x68000000,
-};
-
-int uniphier_nand_init(unsigned int soc,
-		       struct io_block_dev_spec **block_dev_spec)
+int uniphier_nand_init(uintptr_t *block_dev_spec)
 {
 	int ret;
-
-	assert(soc < ARRAY_SIZE(uniphier_nand_base));
-	uniphier_nand.host_base = uniphier_nand_base[soc];
-	if (!uniphier_nand.host_base)
-		return -ENOTSUP;
 
 	ret = uniphier_nand_hw_init(&uniphier_nand);
 	if (ret)
@@ -277,7 +269,7 @@ int uniphier_nand_init(unsigned int soc,
 
 	uniphier_nand_dev_spec.block_size = uniphier_nand.page_size;
 
-	*block_dev_spec = &uniphier_nand_dev_spec;
+	*block_dev_spec = (uintptr_t)&uniphier_nand_dev_spec;
 
 	return 0;
 }

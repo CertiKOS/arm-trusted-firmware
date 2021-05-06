@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <mmio.h>
+#include <ddr_rk3368.h>
+#include <debug.h>
 #include <stdint.h>
 #include <string.h>
-
 #include <platform_def.h>
-
-#include <common/debug.h>
-#include <lib/mmio.h>
-
-#include <ddr_rk3368.h>
 #include <pmu.h>
 #include <rk3368_def.h>
 #include <soc.h>
@@ -400,7 +397,7 @@ void ddr_reg_save(uint32_t pllpdstat, uint64_t base_addr)
 		p_ddr_reg->dpllcon[0] = (mmio_read_32(CRU_BASE +
 						      PLL_CONS(DPLL_ID, 0))
 							& 0xffff) |
-					(0xFFFFu << 16);
+					(0xFFFF << 16);
 		p_ddr_reg->dpllcon[1] = (mmio_read_32(CRU_BASE +
 						      PLL_CONS(DPLL_ID, 1))
 							& 0xffff);
@@ -410,7 +407,7 @@ void ddr_reg_save(uint32_t pllpdstat, uint64_t base_addr)
 		p_ddr_reg->dpllcon[3] = (mmio_read_32(CRU_BASE +
 						      PLL_CONS(DPLL_ID, 3))
 							& 0xffff) |
-					(0xFFFFu << 16);
+					(0xFFFF << 16);
 	} else {
 		ddr_get_dpll_cfg(&p_ddr_reg->dpllcon[0]);
 	}

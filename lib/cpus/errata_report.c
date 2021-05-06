@@ -1,28 +1,25 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 /* Runtime firmware routines to report errata status for the current CPU. */
 
-#include <assert.h>
-#include <stdbool.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <lib/cpus/errata_report.h>
-#include <lib/el3_runtime/cpu_data.h>
-#include <lib/spinlock.h>
+#include <assert.h>
+#include <cpu_data.h>
+#include <debug.h>
+#include <errata_report.h>
+#include <spinlock.h>
+#include <utils.h>
 
 #ifdef IMAGE_BL1
 # define BL_STRING	"BL1"
-#elif defined(__aarch64__) && defined(IMAGE_BL31)
+#elif defined(AARCH64) && defined(IMAGE_BL31)
 # define BL_STRING	"BL31"
-#elif !defined(__arch64__) && defined(IMAGE_BL32)
+#elif defined(AARCH32) && defined(IMAGE_BL32)
 # define BL_STRING	"BL32"
-#elif defined(IMAGE_BL2) && BL2_AT_EL3
-# define BL_STRING "BL2"
 #else
 # error This image should not be printing errata status
 #endif
@@ -34,22 +31,24 @@
  * Returns whether errata needs to be reported. Passed arguments are private to
  * a CPU type.
  */
-int errata_needs_reporting(spinlock_t *lock, uint32_t *reported)
+int32_t errata_needs_reporting(spinlock_t *lock, uint32_t *reported)
 {
-	bool report_now;
+	int32_t report_now;
 
 	/* If already reported, return false. */
-	if (*reported != 0U)
+	if (*reported != 0U) {
 		return 0;
+	}
 
 	/*
 	 * Acquire lock. Determine whether status needs reporting, and then mark
 	 * report status to true.
 	 */
 	spin_lock(lock);
-	report_now = (*reported == 0U);
-	if (report_now)
-		*reported = 1;
+	report_now = (*reported == 0U) ? 1 : 0;
+	if (report_now != 0) {
+		*reported = 1U;
+	}
 	spin_unlock(lock);
 
 	return report_now;
@@ -63,7 +62,7 @@ int errata_needs_reporting(spinlock_t *lock, uint32_t *reported)
  * Applied: INFO
  * Not applied: VERBOSE
  */
-void errata_print_msg(unsigned int status, const char *cpu, const char *id)
+void errata_print_msg(uint32_t status, const char *cpu, const char *id)
 {
 	/* Errata status strings */
 	static const char *const errata_status_str[] = {

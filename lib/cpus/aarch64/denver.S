@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -27,16 +26,12 @@
 	 * table.
 	 * -------------------------------------------------
 	 */
+	.globl	workaround_bpflush_runtime_exceptions
+
 vector_base workaround_bpflush_runtime_exceptions
 
 	.macro	apply_workaround
 	stp	x0, x1, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X0]
-
-	/* Disable cycle counter when event counting is prohibited */
-	mrs	x1, pmcr_el0
-	orr	x0, x1, #PMCR_EL0_DP_BIT
-	msr	pmcr_el0, x0
-	isb
 
 	/* -------------------------------------------------
 	 * A new write-only system register where a write of
@@ -60,19 +55,19 @@ vector_base workaround_bpflush_runtime_exceptions
 	 */
 vector_entry workaround_bpflush_sync_exception_sp_el0
 	b	sync_exception_sp_el0
-end_vector_entry workaround_bpflush_sync_exception_sp_el0
+	check_vector_size workaround_bpflush_sync_exception_sp_el0
 
 vector_entry workaround_bpflush_irq_sp_el0
 	b	irq_sp_el0
-end_vector_entry workaround_bpflush_irq_sp_el0
+	check_vector_size workaround_bpflush_irq_sp_el0
 
 vector_entry workaround_bpflush_fiq_sp_el0
 	b	fiq_sp_el0
-end_vector_entry workaround_bpflush_fiq_sp_el0
+	check_vector_size workaround_bpflush_fiq_sp_el0
 
 vector_entry workaround_bpflush_serror_sp_el0
 	b	serror_sp_el0
-end_vector_entry workaround_bpflush_serror_sp_el0
+	check_vector_size workaround_bpflush_serror_sp_el0
 
 	/* ---------------------------------------------------------------------
 	 * Current EL with SP_ELx: 0x200 - 0x400
@@ -80,19 +75,19 @@ end_vector_entry workaround_bpflush_serror_sp_el0
 	 */
 vector_entry workaround_bpflush_sync_exception_sp_elx
 	b	sync_exception_sp_elx
-end_vector_entry workaround_bpflush_sync_exception_sp_elx
+	check_vector_size workaround_bpflush_sync_exception_sp_elx
 
 vector_entry workaround_bpflush_irq_sp_elx
 	b	irq_sp_elx
-end_vector_entry workaround_bpflush_irq_sp_elx
+	check_vector_size workaround_bpflush_irq_sp_elx
 
 vector_entry workaround_bpflush_fiq_sp_elx
 	b	fiq_sp_elx
-end_vector_entry workaround_bpflush_fiq_sp_elx
+	check_vector_size workaround_bpflush_fiq_sp_elx
 
 vector_entry workaround_bpflush_serror_sp_elx
 	b	serror_sp_elx
-end_vector_entry workaround_bpflush_serror_sp_elx
+	check_vector_size workaround_bpflush_serror_sp_elx
 
 	/* ---------------------------------------------------------------------
 	 * Lower EL using AArch64 : 0x400 - 0x600
@@ -101,22 +96,22 @@ end_vector_entry workaround_bpflush_serror_sp_elx
 vector_entry workaround_bpflush_sync_exception_aarch64
 	apply_workaround
 	b	sync_exception_aarch64
-end_vector_entry workaround_bpflush_sync_exception_aarch64
+	check_vector_size workaround_bpflush_sync_exception_aarch64
 
 vector_entry workaround_bpflush_irq_aarch64
 	apply_workaround
 	b	irq_aarch64
-end_vector_entry workaround_bpflush_irq_aarch64
+	check_vector_size workaround_bpflush_irq_aarch64
 
 vector_entry workaround_bpflush_fiq_aarch64
 	apply_workaround
 	b	fiq_aarch64
-end_vector_entry workaround_bpflush_fiq_aarch64
+	check_vector_size workaround_bpflush_fiq_aarch64
 
 vector_entry workaround_bpflush_serror_aarch64
 	apply_workaround
 	b	serror_aarch64
-end_vector_entry workaround_bpflush_serror_aarch64
+	check_vector_size workaround_bpflush_serror_aarch64
 
 	/* ---------------------------------------------------------------------
 	 * Lower EL using AArch32 : 0x600 - 0x800
@@ -125,22 +120,22 @@ end_vector_entry workaround_bpflush_serror_aarch64
 vector_entry workaround_bpflush_sync_exception_aarch32
 	apply_workaround
 	b	sync_exception_aarch32
-end_vector_entry workaround_bpflush_sync_exception_aarch32
+	check_vector_size workaround_bpflush_sync_exception_aarch32
 
 vector_entry workaround_bpflush_irq_aarch32
 	apply_workaround
 	b	irq_aarch32
-end_vector_entry workaround_bpflush_irq_aarch32
+	check_vector_size workaround_bpflush_irq_aarch32
 
 vector_entry workaround_bpflush_fiq_aarch32
 	apply_workaround
 	b	fiq_aarch32
-end_vector_entry workaround_bpflush_fiq_aarch32
+	check_vector_size workaround_bpflush_fiq_aarch32
 
 vector_entry workaround_bpflush_serror_aarch32
 	apply_workaround
 	b	serror_aarch32
-end_vector_entry workaround_bpflush_serror_aarch32
+	check_vector_size workaround_bpflush_serror_aarch32
 
 	.global	denver_disable_dco
 
@@ -161,19 +156,13 @@ endfunc denver_disable_ext_debug
 	 * ----------------------------------------------------
 	 */
 func denver_enable_dco
-	/* DCO is not supported on PN5 and later */
-	mrs	x1, midr_el1
-	mov_imm	x2, DENVER_MIDR_PN4
-	cmp	x1, x2
-	b.hi	1f
-
 	mov	x18, x30
 	bl	plat_my_core_pos
 	mov	x1, #1
 	lsl	x1, x1, x0
 	msr	s3_0_c15_c0_2, x1
 	mov	x30, x18
-1:	ret
+	ret
 endfunc denver_enable_dco
 
 	/* ----------------------------------------------------
@@ -181,14 +170,10 @@ endfunc denver_enable_dco
 	 * ----------------------------------------------------
 	 */
 func denver_disable_dco
-	/* DCO is not supported on PN5 and later */
-	mrs	x1, midr_el1
-	mov_imm	x2, DENVER_MIDR_PN4
-	cmp	x1, x2
-	b.hi	2f
+
+	mov	x18, x30
 
 	/* turn off background work */
-	mov	x18, x30
 	bl	plat_my_core_pos
 	mov	x1, #1
 	lsl	x1, x1, x0
@@ -204,7 +189,7 @@ func denver_disable_dco
 	cbnz	x2, 1b
 
 	mov	x30, x18
-2:	ret
+	ret
 endfunc denver_disable_dco
 
 func check_errata_cve_2017_5715
@@ -363,23 +348,37 @@ func denver_cpu_reg_dump
 	ret
 endfunc denver_cpu_reg_dump
 
-/* macro to declare cpu_ops for Denver SKUs */
-.macro	denver_cpu_ops_wa midr
-	declare_cpu_ops_wa denver, \midr, \
-		denver_reset_func, \
-		check_errata_cve_2017_5715, \
-		CPU_NO_EXTRA2_FUNC, \
-		denver_core_pwr_dwn, \
-		denver_cluster_pwr_dwn
-.endm
+declare_cpu_ops_wa denver, DENVER_MIDR_PN0, \
+	denver_reset_func, \
+	check_errata_cve_2017_5715, \
+	CPU_NO_EXTRA2_FUNC, \
+	denver_core_pwr_dwn, \
+	denver_cluster_pwr_dwn
 
-denver_cpu_ops_wa DENVER_MIDR_PN0
-denver_cpu_ops_wa DENVER_MIDR_PN1
-denver_cpu_ops_wa DENVER_MIDR_PN2
-denver_cpu_ops_wa DENVER_MIDR_PN3
-denver_cpu_ops_wa DENVER_MIDR_PN4
-denver_cpu_ops_wa DENVER_MIDR_PN5
-denver_cpu_ops_wa DENVER_MIDR_PN6
-denver_cpu_ops_wa DENVER_MIDR_PN7
-denver_cpu_ops_wa DENVER_MIDR_PN8
-denver_cpu_ops_wa DENVER_MIDR_PN9
+declare_cpu_ops_wa denver, DENVER_MIDR_PN1, \
+	denver_reset_func, \
+	check_errata_cve_2017_5715, \
+	CPU_NO_EXTRA2_FUNC, \
+	denver_core_pwr_dwn, \
+	denver_cluster_pwr_dwn
+
+declare_cpu_ops_wa denver, DENVER_MIDR_PN2, \
+	denver_reset_func, \
+	check_errata_cve_2017_5715, \
+	CPU_NO_EXTRA2_FUNC, \
+	denver_core_pwr_dwn, \
+	denver_cluster_pwr_dwn
+
+declare_cpu_ops_wa denver, DENVER_MIDR_PN3, \
+	denver_reset_func, \
+	check_errata_cve_2017_5715, \
+	CPU_NO_EXTRA2_FUNC, \
+	denver_core_pwr_dwn, \
+	denver_cluster_pwr_dwn
+
+declare_cpu_ops_wa denver, DENVER_MIDR_PN4, \
+	denver_reset_func, \
+	check_errata_cve_2017_5715, \
+	CPU_NO_EXTRA2_FUNC, \
+	denver_core_pwr_dwn, \
+	denver_cluster_pwr_dwn

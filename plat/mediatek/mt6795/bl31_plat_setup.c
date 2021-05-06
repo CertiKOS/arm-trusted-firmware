@@ -1,43 +1,42 @@
 /*
- * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
+#include <arm_gic.h>
 #include <assert.h>
-#include <string.h>
-
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/arm/cci.h>
-#include <drivers/console.h>
-#include <drivers/generic_delay_timer.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/mmio.h>
-#include <lib/utils_def.h>
-#include <lib/xlat_tables/xlat_tables.h>
-#include <plat/common/common_def.h>
-#include <plat/common/platform.h>
-
+#include <bl_common.h>
+#include <cci.h>
+#include <common_def.h>
+#include <console.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <generic_delay_timer.h>
 #include <mcucfg.h>
-#include <mt_cpuxgpt.h>
-#include <mtk_plat_common.h>
+#include <mmio.h>
 #include <mtk_sip_svc.h>
+#include <mtk_plat_common.h>
+#include <mt_cpuxgpt.h>
+#include <platform.h>
 #include <plat_private.h>
-
+#include <string.h>
+#include <xlat_tables.h>
 /*******************************************************************************
  * Declarations of linker defined symbols which will help us find the layout
  * of trusted SRAM
  ******************************************************************************/
+unsigned long __RO_START__;
+unsigned long __RO_END__;
+
 /*
  * The next 2 constants identify the extents of the code & RO data region.
  * These addresses are used by the MMU setup code and therefore they must be
  * page-aligned.  It is the responsibility of the linker script to ensure that
  * __RO_START__ and __RO_END__ linker symbols refer to page-aligned addresses.
  */
-IMPORT_SYM(unsigned long, __RO_START__,	BL31_RO_BASE);
-IMPORT_SYM(unsigned long, __RO_END__,	BL31_RO_LIMIT);
+#define BL31_RO_BASE (unsigned long)(&__RO_START__)
+#define BL31_RO_LIMIT (unsigned long)(&__RO_END__)
 
 /*
  * Placeholder variables for copying the arguments that have been passed to
@@ -168,21 +167,22 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 
 /*******************************************************************************
  * Perform any BL3-1 early platform setup. Here is an opportunity to copy
- * parameters passed by the calling EL (S-EL1 in BL2 & EL3 in BL1) before they
+ * parameters passed by the calling EL (S-EL1 in BL2 & S-EL3 in BL1) before they
  * are lost (potentially). This needs to be done before the MMU is initialized
  * so that the memory layout can be used while creating page tables.
  * BL2 has flushed this information to memory, so we are guaranteed to pick up
  * good data.
  ******************************************************************************/
-void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
-				u_register_t arg2, u_register_t arg3)
+void bl31_early_platform_setup(bl31_params_t *from_bl2,
+						 void *plat_params_from_bl2)
 {
-	struct mtk_bl_param_t *pmtk_bl_param = (struct mtk_bl_param_t *)arg0;
+	struct mtk_bl_param_t *pmtk_bl_param =
+	(struct mtk_bl_param_t *)from_bl2;
 	struct atf_arg_t *teearg;
 	unsigned long long normal_base;
 	unsigned long long atf_base;
 
-	assert(pmtk_bl_param != NULL);
+	assert(from_bl2 != NULL);
 	/*
 	 * Mediatek preloader(i.e, BL2) is in 32 bit state, high 32bits
 	 * of 64 bit GP registers are UNKNOWN if CPU warm reset from 32 bit
@@ -191,6 +191,8 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 	 */
 	pmtk_bl_param =
 	(struct mtk_bl_param_t *)((uint64_t)pmtk_bl_param & 0x00000000ffffffff);
+	plat_params_from_bl2 =
+	(void *)((uint64_t)plat_params_from_bl2 & 0x00000000ffffffff);
 
 	teearg  = (struct atf_arg_t *)pmtk_bl_param->tee_info_addr;
 
@@ -342,7 +344,7 @@ static entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(void)
 	next_image_info = &bl33_image_ep_info;
 
 	/* Figure out what mode we enter the non-secure world in */
-	if (el_implemented(2) != EL_IMPL_NONE) {
+	if (EL_IMPLEMENTED(2)) {
 		INFO("Kernel_EL2\n");
 		mode = MODE_EL2;
 	} else{
@@ -444,6 +446,6 @@ void bl31_prepare_kernel_entry(uint64_t k32_64)
 	INFO("BL3-1: Next image address = 0x%llx\n",
 		(unsigned long long) next_image_info->pc);
 	INFO("BL3-1: Next image spsr = 0x%x\n", next_image_info->spsr);
-	cm_init_my_context(next_image_info);
+	cm_init_context(read_mpidr_el1(), next_image_info);
 	cm_prepare_el3_exit(image_type);
 }

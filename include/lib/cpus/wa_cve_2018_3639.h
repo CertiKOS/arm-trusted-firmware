@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef WA_CVE_2018_3639_H
-#define WA_CVE_2018_3639_H
+#ifndef __WA_CVE_2018_3639_H__
+#define __WA_CVE_2018_3639_H__
 
 void *wa_cve_2018_3639_get_disable_ptr(void);
 
-#endif /* WA_CVE_2018_3639_H */
+#endif /* __WA_CVE_2018_3639_H__ */

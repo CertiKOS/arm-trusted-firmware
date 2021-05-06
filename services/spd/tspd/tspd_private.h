@@ -1,18 +1,17 @@
 /*
- * Copyright (c) 2013-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TSPD_PRIVATE_H
-#define TSPD_PRIVATE_H
-
-#include <platform_def.h>
+#ifndef __TSPD_PRIVATE_H__
+#define __TSPD_PRIVATE_H__
 
 #include <arch.h>
-#include <bl31/interrupt_mgmt.h>
 #include <context.h>
-#include <lib/psci/psci.h>
+#include <interrupt_mgmt.h>
+#include <platform_def.h>
+#include <psci.h>
 
 /*******************************************************************************
  * Secure Payload PM state information e.g. SP is suspended, uninitialised etc
@@ -126,11 +125,10 @@
 #define TSPD_SP_CTX_SIZE	0x90
 #define TSPD_SP_CTX_ENTRIES		(TSPD_SP_CTX_SIZE >> DWORD_SHIFT)
 
-#ifndef __ASSEMBLER__
+#ifndef __ASSEMBLY__
 
+#include <cassert.h>
 #include <stdint.h>
-
-#include <lib/cassert.h>
 
 /*
  * The number of arguments to save during a SMC call for TSP.
@@ -188,19 +186,18 @@ typedef struct tsp_context {
 	uint64_t saved_tsp_args[TSP_NUM_ARGS];
 #if TSP_NS_INTR_ASYNC_PREEMPT
 	sp_ctx_regs_t sp_ctx;
-	bool preempted_by_sel1_intr;
 #endif
 } tsp_context_t;
 
 /* Helper macros to store and retrieve tsp args from tsp_context */
-#define store_tsp_args(_tsp_ctx, _x1, _x2)		do {\
-				_tsp_ctx->saved_tsp_args[0] = _x1;\
-				_tsp_ctx->saved_tsp_args[1] = _x2;\
+#define store_tsp_args(tsp_ctx, x1, x2)		do {\
+				tsp_ctx->saved_tsp_args[0] = x1;\
+				tsp_ctx->saved_tsp_args[1] = x2;\
 			} while (0)
 
-#define get_tsp_args(_tsp_ctx, _x1, _x2)	do {\
-				_x1 = _tsp_ctx->saved_tsp_args[0];\
-				_x2 = _tsp_ctx->saved_tsp_args[1];\
+#define get_tsp_args(tsp_ctx, x1, x2)	do {\
+				x1 = tsp_ctx->saved_tsp_args[0];\
+				x2 = tsp_ctx->saved_tsp_args[1];\
 			} while (0)
 
 /* TSPD power management handlers */
@@ -209,7 +206,7 @@ extern const spd_pm_ops_t tspd_pm;
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-typedef struct tsp_vectors tsp_vectors_t;
+struct tsp_vectors;
 
 /*******************************************************************************
  * Function & Data prototypes
@@ -218,16 +215,14 @@ uint64_t tspd_enter_sp(uint64_t *c_rt_ctx);
 void __dead2 tspd_exit_sp(uint64_t c_rt_ctx, uint64_t ret);
 uint64_t tspd_synchronous_sp_entry(tsp_context_t *tsp_ctx);
 void __dead2 tspd_synchronous_sp_exit(tsp_context_t *tsp_ctx, uint64_t ret);
-void tspd_init_tsp_ep_state(struct entry_point_info *tsp_entry_point,
+void tspd_init_tsp_ep_state(struct entry_point_info *tsp_ep,
 				uint32_t rw,
 				uint64_t pc,
 				tsp_context_t *tsp_ctx);
 int tspd_abort_preempted_smc(tsp_context_t *tsp_ctx);
 
-uint64_t tspd_handle_sp_preemption(void *handle);
-
 extern tsp_context_t tspd_sp_context[TSPD_CORE_COUNT];
-extern tsp_vectors_t *tsp_vectors;
-#endif /*__ASSEMBLER__*/
+extern struct tsp_vectors *tsp_vectors;
+#endif /*__ASSEMBLY__*/
 
-#endif /* TSPD_PRIVATE_H */
+#endif /* __TSPD_PRIVATE_H__ */

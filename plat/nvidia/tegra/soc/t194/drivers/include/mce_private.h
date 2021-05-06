@@ -1,11 +1,35 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of ARM nor the names of its contributors may be used
+ * to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MCE_PRIVATE_H
-#define MCE_PRIVATE_H
+#ifndef __MCE_PRIVATE_H__
+#define __MCE_PRIVATE_H__
 
 #include <stdbool.h>
 #include <tegra_def.h>
@@ -53,13 +77,11 @@ uint64_t nvg_get_cstate_stat_query_value(void);
 int32_t nvg_is_sc7_allowed(void);
 int32_t nvg_online_core(uint32_t core);
 int32_t nvg_update_ccplex_gsc(uint32_t gsc_idx);
-int32_t nvg_enter_cstate(uint32_t state, uint32_t wake_time);
 int32_t nvg_roc_clean_cache_trbits(void);
+int32_t nvg_enter_cstate(uint32_t state, uint32_t wake_time);
 void nvg_enable_strict_checking_mode(void);
-void nvg_verify_strict_checking_mode(void);
 void nvg_system_shutdown(void);
 void nvg_system_reboot(void);
-void nvg_clear_hsm_corr_status(void);
 
 /* declarations for assembly functions */
 void nvg_set_request_data(uint64_t req, uint64_t data);
@@ -71,9 +93,7 @@ uint64_t nvg_cache_inval_all(void);
 
 /* MCE helper functions */
 void mce_enable_strict_checking(void);
-void mce_verify_strict_checking(void);
 void mce_system_shutdown(void);
 void mce_system_reboot(void);
-void mce_clear_hsm_corr_status(void);
 
-#endif /* MCE_PRIVATE_H */
+#endif /* __MCE_PRIVATE_H__ */

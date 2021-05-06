@@ -1,13 +1,11 @@
 /*
- * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PL011_H
-#define PL011_H
-
-#include <drivers/console.h>
+#ifndef __PL011_H__
+#define __PL011_H__
 
 /* PL011 Registers */
 #define UARTDR                    0x000
@@ -81,19 +79,4 @@
 
 #endif /* !PL011_GENERIC_UART */
 
-#ifndef __ASSEMBLER__
-
-#include <stdint.h>
-
-/*
- * Initialize a new PL011 console instance and register it with the console
- * framework. The |console| pointer must point to storage that will be valid
- * for the lifetime of the console, such as a global or static local variable.
- * Its contents will be reinitialized from scratch.
- */
-int console_pl011_register(uintptr_t baseaddr, uint32_t clock, uint32_t baud,
-			   console_t *console);
-
-#endif /*__ASSEMBLER__*/
-
-#endif /* PL011_H */
+#endif	/* __PL011_H__ */

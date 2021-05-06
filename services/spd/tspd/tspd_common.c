@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <string.h>
-
 #include <arch_helpers.h>
-#include <bl32/tsp/tsp.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <lib/el3_runtime/context_mgmt.h>
-#include <lib/utils.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <context_mgmt.h>
+#include <debug.h>
+#include <string.h>
+#include <tsp.h>
+#include <utils.h>
 #include "tspd_private.h"
 
 /*******************************************************************************
@@ -81,7 +79,7 @@ uint64_t tspd_synchronous_sp_entry(tsp_context_t *tsp_ctx)
 	cm_set_next_eret_context(SECURE);
 
 	rc = tspd_enter_sp(&tsp_ctx->c_rt_ctx);
-#if ENABLE_ASSERTIONS
+#if DEBUG
 	tsp_ctx->c_rt_ctx = 0;
 #endif
 

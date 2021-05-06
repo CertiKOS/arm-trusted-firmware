@@ -1,26 +1,23 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
-
-#include <common/debug.h>
-#include <drivers/io/io_driver.h>
-#include <drivers/io/io_semihosting.h>
-#include <drivers/io/io_storage.h>
-#include <lib/semihosting.h>
-#include <plat/arm/common/plat_arm.h>
-#include <plat/common/common_def.h>
+#include <common_def.h>
+#include <debug.h>
+#include <io_driver.h>
+#include <io_storage.h>
+#include <io_semihosting.h>
+#include <plat_arm.h>
+#include <semihosting.h>	/* For FOPEN_MODE_... */
 
 /* Semihosting filenames */
 #define BL2_IMAGE_NAME			"bl2.bin"
 #define BL31_IMAGE_NAME			"bl31.bin"
 #define BL32_IMAGE_NAME			"bl32.bin"
 #define BL33_IMAGE_NAME			"bl33.bin"
-#define TB_FW_CONFIG_NAME		"fvp_tb_fw_config.dtb"
-#define HW_CONFIG_NAME			"hw_config.dtb"
 
 #if TRUSTED_BOARD_BOOT
 #define TRUSTED_BOOT_FW_CERT_NAME	"tb_fw.crt"
@@ -52,14 +49,6 @@ static const io_file_spec_t sh_file_spec[] = {
 	},
 	[BL33_IMAGE_ID] = {
 		.path = BL33_IMAGE_NAME,
-		.mode = FOPEN_MODE_RB
-	},
-	[TB_FW_CONFIG_ID] = {
-		.path = TB_FW_CONFIG_NAME,
-		.mode = FOPEN_MODE_RB
-	},
-	[HW_CONFIG_ID] = {
-		.path = HW_CONFIG_NAME,
 		.mode = FOPEN_MODE_RB
 	},
 #if TRUSTED_BOARD_BOOT
@@ -120,22 +109,18 @@ void plat_arm_io_setup(void)
 {
 	int io_result;
 
-	io_result = arm_io_setup();
-	if (io_result < 0) {
-		panic();
-	}
+	arm_io_setup();
 
 	/* Register the additional IO devices on this platform */
 	io_result = register_io_dev_sh(&sh_dev_con);
-	if (io_result < 0) {
-		panic();
-	}
+	assert(io_result == 0);
 
 	/* Open connections to devices and cache the handles */
 	io_result = io_dev_open(sh_dev_con, (uintptr_t)NULL, &sh_dev_handle);
-	if (io_result < 0) {
-		panic();
-	}
+	assert(io_result == 0);
+
+	/* Ignore improbable errors in release builds */
+	(void)io_result;
 }
 
 /*

@@ -1,22 +1,40 @@
 /*
- * Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * Neither the name of ARM nor the names of its contributors may be used
+ * to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <assert.h>
-#include <string.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <lib/mmio.h>
-
-#include <mce.h>
+#include <debug.h>
+#include <mmio.h>
+#include <string.h>
 #include <tegra194_private.h>
 #include <tegra_def.h>
 #include <tegra_private.h>
-
-extern uint64_t tegra_bl31_phys_base;
 
 #define MISCREG_AA64_RST_LOW		0x2004U
 #define MISCREG_AA64_RST_HIGH		0x2008U
@@ -30,13 +48,9 @@ void plat_secondary_setup(void)
 {
 	uint32_t addr_low, addr_high;
 	plat_params_from_bl2_t *params_from_bl2 = bl31_get_plat_params();
-	uint64_t cpu_reset_handler_base, cpu_reset_handler_size, tzdram_addr;
-	uint64_t src_len_bytes = BL_END - tegra_bl31_phys_base;
+	uint64_t cpu_reset_handler_base, cpu_reset_handler_size;
 
 	INFO("Setting up secondary CPU boot\n");
-
-	tzdram_addr = params_from_bl2->tzdram_base +
-		      tegra194_get_cpu_reset_handler_size();
 
 	/*
 	 * The BL31 code resides in the TZSRAM which loses state
@@ -45,9 +59,9 @@ void plat_secondary_setup(void)
 	 */
 	cpu_reset_handler_base = tegra194_get_cpu_reset_handler_base();
 	cpu_reset_handler_size = tegra194_get_cpu_reset_handler_size();
-	memcpy((void *)((uintptr_t)params_from_bl2->tzdram_base),
-		(void *)((uintptr_t)cpu_reset_handler_base),
-		cpu_reset_handler_size);
+	tegra_memcpy16(params_from_bl2->tzdram_base,
+			cpu_reset_handler_base,
+			cpu_reset_handler_size);
 
 	/* TZDRAM base will be used as the "resume" address */
 	addr_low = (uint32_t)params_from_bl2->tzdram_base | CPU_RESET_MODE_AA64;
@@ -55,21 +69,11 @@ void plat_secondary_setup(void)
 
 	/* write lower 32 bits first, then the upper 11 bits */
 	mmio_write_32(TEGRA_MISC_BASE + MISCREG_AA64_RST_LOW, addr_low);
-	assert(mmio_read_32(TEGRA_MISC_BASE + MISCREG_AA64_RST_LOW) == addr_low);
 	mmio_write_32(TEGRA_MISC_BASE + MISCREG_AA64_RST_HIGH, addr_high);
-	assert(mmio_read_32(TEGRA_MISC_BASE + MISCREG_AA64_RST_HIGH) == addr_high);
 
 	/* save reset vector to be used during SYSTEM_SUSPEND exit */
 	mmio_write_32(TEGRA_SCRATCH_BASE + SCRATCH_RESET_VECTOR_LO,
 			addr_low);
-	assert(mmio_read_32(TEGRA_SCRATCH_BASE + SCRATCH_RESET_VECTOR_LO) == addr_low);
 	mmio_write_32(TEGRA_SCRATCH_BASE + SCRATCH_RESET_VECTOR_HI,
 			addr_high);
-	assert(mmio_read_32(TEGRA_SCRATCH_BASE + SCRATCH_RESET_VECTOR_HI) == addr_high);
-	mmio_write_32(TEGRA_SCRATCH_BASE + SECURE_SCRATCH_RSV72_LO,
-						(uint32_t)tzdram_addr);
-	assert(mmio_read_32(TEGRA_SCRATCH_BASE + SECURE_SCRATCH_RSV72_LO) == (uint32_t)tzdram_addr);
-	mmio_write_32(TEGRA_SCRATCH_BASE + SECURE_SCRATCH_RSV72_HI,
-						(uint32_t)src_len_bytes);
-	assert(mmio_read_32(TEGRA_SCRATCH_BASE + SECURE_SCRATCH_RSV72_HI) == (uint32_t)src_len_bytes);
 }

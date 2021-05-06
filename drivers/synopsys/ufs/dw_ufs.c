@@ -5,13 +5,12 @@
  */
 
 #include <assert.h>
+#include <debug.h>
+#include <dw_ufs.h>
+#include <mmio.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <common/debug.h>
-#include <drivers/dw_ufs.h>
-#include <drivers/ufs.h>
-#include <lib/mmio.h>
+#include <ufs.h>
 
 static int dwufs_phy_init(ufs_params_t *params)
 {
@@ -98,21 +97,10 @@ static int dwufs_phy_set_pwr_mode(ufs_params_t *params)
 	int result;
 	unsigned int data, tx_lanes, rx_lanes;
 	uintptr_t base;
-	unsigned int flags;
 
 	assert((params != NULL) && (params->reg_base != 0));
 
 	base = params->reg_base;
-	flags = params->flags;
-	if ((flags & UFS_FLAGS_VENDOR_SKHYNIX) != 0U) {
-		NOTICE("ufs: H**** device must set VS_DebugSaveConfigTime 0x10\n");
-		/* VS_DebugSaveConfigTime */
-		result = ufshc_dme_set(0xd0a0, 0x0, 0x10);
-		assert(result == 0);
-		/* sync length */
-		result = ufshc_dme_set(0x1556, 0x0, 0x48);
-		assert(result == 0);
-	}
 
 	result = ufshc_dme_get(PA_TACTIVATE_OFFSET, 0, &data);
 	assert(result == 0);
@@ -183,7 +171,7 @@ static int dwufs_phy_set_pwr_mode(ufs_params_t *params)
 	return 0;
 }
 
-static const ufs_ops_t dw_ufs_ops = {
+const ufs_ops_t dw_ufs_ops = {
 	.phy_init		= dwufs_phy_init,
 	.phy_set_pwr_mode	= dwufs_phy_set_pwr_mode,
 };

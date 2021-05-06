@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PLAT_SIP_CALLS_H
-#define PLAT_SIP_CALLS_H
+#ifndef __PLAT_SIP_CALLS_H__
+#define __PLAT_SIP_CALLS_H__
 
 #define RK_PLAT_SIP_NUM_CALLS	0
 
-#endif /* PLAT_SIP_CALLS_H */
+#endif /* __PLAT_SIP_CALLS_H__ */

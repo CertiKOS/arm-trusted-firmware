@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
+#include <assert.h>
+#include <debug.h>
 #include <denver.h>
-#include <lib/mmio.h>
-#include <lib/psci/psci.h>
-#include <plat/common/platform.h>
-
+#include <mmio.h>
+#include <platform.h>
+#include <psci.h>
 #include <pmc.h>
 #include <tegra_def.h>
 

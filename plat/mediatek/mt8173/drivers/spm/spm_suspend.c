@@ -1,14 +1,12 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#include <common/debug.h>
-#include <drivers/delay_timer.h>
-#include <lib/bakery_lock.h>
-#include <lib/mmio.h>
-
+#include <bakery_lock.h>
+#include <debug.h>
+#include <delay_timer.h>
+#include <mmio.h>
 #include <mt8173_def.h>
 #include <spm.h>
 #include <spm_suspend.h>
@@ -239,13 +237,13 @@ static struct pwr_ctrl spm_ctrl = {
 /*
  * go_to_sleep_before_wfi() - trigger SPM to enter suspend scenario
  */
-static void go_to_sleep_before_wfi(const unsigned int flags_spm)
+static void go_to_sleep_before_wfi(const unsigned int spm_flags)
 {
 	struct pwr_ctrl *pwrctrl;
 
 	pwrctrl = &spm_ctrl;
 
-	set_pwrctrl_pcm_flags(pwrctrl, flags_spm);
+	set_pwrctrl_pcm_flags(pwrctrl, spm_flags);
 
 	spm_set_sysclk_settle();
 

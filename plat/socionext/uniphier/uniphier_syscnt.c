@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <plat/common/platform.h>
+#include <platform.h>
 
 unsigned int plat_get_syscnt_freq2(void)
 {

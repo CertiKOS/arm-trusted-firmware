@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <drivers/delay_timer.h>
+#include <delay_timer.h>
+#include <platform_def.h>
 
 static uint32_t plat_get_timer_value(void)
 {

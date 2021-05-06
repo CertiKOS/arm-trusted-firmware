@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TBB_CERT_H
-#define TBB_CERT_H
+#ifndef TBB_CERT_H_
+#define TBB_CERT_H_
 
 #include "cert.h"
 
@@ -23,8 +23,7 @@ enum {
 	TRUSTED_OS_FW_CONTENT_CERT,
 	NON_TRUSTED_FW_KEY_CERT,
 	NON_TRUSTED_FW_CONTENT_CERT,
-	SIP_SECURE_PARTITION_CONTENT_CERT,
 	FWU_CERT
 };
 
-#endif /* TBB_CERT_H */
+#endif /* TBB_CERT_H_ */

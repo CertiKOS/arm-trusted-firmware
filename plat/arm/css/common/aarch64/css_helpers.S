@@ -1,13 +1,12 @@
 /*
- * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include <arch.h>
 #include <asm_macros.S>
 #include <cpu_macros.S>
-#include <platform_def.h>
+#include <css_def.h>
 
 	.weak	plat_secondary_cold_boot_setup
 	.weak	plat_get_my_entrypoint
@@ -89,27 +88,10 @@ endfunc css_calc_core_pos_swap_cluster
 	 * cpu (applicable ony after a cold boot)
 	 * -----------------------------------------------------
 	 */
-#if CSS_USE_SCMI_SDS_DRIVER
 func plat_is_my_cpu_primary
 	mov	x9, x30
 	bl	plat_my_core_pos
-	mov	x4, x0
-	bl	sds_get_primary_cpu_id
-	/* Check for error */
-	mov	x1, #0xffffffff
-	cmp	x0, x1
-	b.eq	1f
-	cmp	x0, x4
-	cset	w0, eq
-	ret	x9
-1:
-	no_ret	plat_panic_handler
-endfunc plat_is_my_cpu_primary
-#else
-func plat_is_my_cpu_primary
-	mov	x9, x30
-	bl	plat_my_core_pos
-	mov_imm	x1, SCP_BOOT_CFG_ADDR
+	ldr	x1, =SCP_BOOT_CFG_ADDR
 	ldr	x1, [x1]
 	ubfx	x1, x1, #PLAT_CSS_PRIMARY_CPU_SHIFT, \
 			#PLAT_CSS_PRIMARY_CPU_BIT_WIDTH
@@ -117,4 +99,3 @@ func plat_is_my_cpu_primary
 	cset	w0, eq
 	ret	x9
 endfunc plat_is_my_cpu_primary
-#endif

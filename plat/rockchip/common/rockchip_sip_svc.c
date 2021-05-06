@@ -5,29 +5,27 @@
  */
 
 #include <assert.h>
-
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/mmio.h>
-#include <tools_share/uuid.h>
-
+#include <debug.h>
+#include <mmio.h>
 #include <plat_sip_calls.h>
 #include <rockchip_sip_svc.h>
+#include <runtime_svc.h>
+#include <uuid.h>
 
 /* Rockchip SiP Service UUID */
-DEFINE_SVC_UUID2(rk_sip_svc_uid,
-	0xe2c76fe8, 0x3e31, 0xe611, 0xb7, 0x0d,
-	0x8f, 0x88, 0xee, 0x74, 0x7b, 0x72);
+DEFINE_SVC_UUID(rk_sip_svc_uid,
+		0xe86fc7e2, 0x313e, 0x11e6, 0xb7, 0x0d,
+		0x8f, 0x88, 0xee, 0x74, 0x7b, 0x72);
 
 #pragma weak rockchip_plat_sip_handler
-uintptr_t rockchip_plat_sip_handler(uint32_t smc_fid,
-				    u_register_t x1,
-				    u_register_t x2,
-				    u_register_t x3,
-				    u_register_t x4,
-				    void *cookie,
-				    void *handle,
-				    u_register_t flags)
+uint64_t rockchip_plat_sip_handler(uint32_t smc_fid,
+				   uint64_t x1,
+				   uint64_t x2,
+				   uint64_t x3,
+				   uint64_t x4,
+				   void *cookie,
+				   void *handle,
+				   uint64_t flags)
 {
 	ERROR("%s: unhandled SMC (0x%x)\n", __func__, smc_fid);
 	SMC_RET1(handle, SMC_UNK);
@@ -36,14 +34,14 @@ uintptr_t rockchip_plat_sip_handler(uint32_t smc_fid,
 /*
  * This function is responsible for handling all SiP calls from the NS world
  */
-uintptr_t sip_smc_handler(uint32_t smc_fid,
-			  u_register_t x1,
-			  u_register_t x2,
-			  u_register_t x3,
-			  u_register_t x4,
-			  void *cookie,
-			  void *handle,
-			  u_register_t flags)
+uint64_t sip_smc_handler(uint32_t smc_fid,
+			 uint64_t x1,
+			 uint64_t x2,
+			 uint64_t x3,
+			 uint64_t x4,
+			 void *cookie,
+			 void *handle,
+			 uint64_t flags)
 {
 	uint32_t ns;
 
@@ -61,11 +59,13 @@ uintptr_t sip_smc_handler(uint32_t smc_fid,
 	case SIP_SVC_UID:
 		/* Return UID to the caller */
 		SMC_UUID_RET(handle, rk_sip_svc_uid);
+		break;
 
 	case SIP_SVC_VERSION:
 		/* Return the version of current implementation */
 		SMC_RET2(handle, RK_SIP_SVC_VERSION_MAJOR,
 			RK_SIP_SVC_VERSION_MINOR);
+		break;
 
 	default:
 		return rockchip_plat_sip_handler(smc_fid, x1, x2, x3, x4,

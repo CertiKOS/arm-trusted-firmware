@@ -1,7 +1,8 @@
 #
-# Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2016-2017, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+#
 #
 
 # OS specific parts for builds in a Windows_NT environment. The
@@ -13,7 +14,6 @@ ifndef WINDOWS_MK
     WINDOWS_MK := $(lastword $(MAKEFILE_LIST))
 
     ECHO_BLANK_LINE := @cmd /c echo.
-    ECHO_QUIET := @rem
     DIR_DELIM := $(strip \)
     BIN_EXT   := .exe
     PATH_SEP  := ;
@@ -85,6 +85,4 @@ define MAKE_BUILD_STRINGS
 	@echo $$(BUILT_TIME_DATE_STRING) $$(VERSION_STRING_MESSAGE) | \
 		$$(CC) $$(TF_CFLAGS) $$(CFLAGS) -x c -c - -o $1
 endef
-
-MSVC_NMAKE := nmake.exe
 

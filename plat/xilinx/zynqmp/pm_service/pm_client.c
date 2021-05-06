@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,42 +10,28 @@
  */
 
 #include <assert.h>
+#include <bakery_lock.h>
+#include <gicv2.h>
+#include <gic_common.h>
+#include <bl_common.h>
+#include <mmio.h>
 #include <string.h>
-
-#include <common/bl_common.h>
-#include <drivers/arm/gic_common.h>
-#include <drivers/arm/gicv2.h>
-#include <lib/bakery_lock.h>
-#include <lib/mmio.h>
-#include <lib/utils.h>
-
-#include <plat_ipi.h>
-#include <zynqmp_def.h>
+#include <utils.h>
 #include "pm_api_sys.h"
 #include "pm_client.h"
 #include "pm_ipi.h"
+#include "../zynqmp_def.h"
 
 #define IRQ_MAX		84
 #define NUM_GICD_ISENABLER	((IRQ_MAX >> 5) + 1)
 #define UNDEFINED_CPUID		(~0)
 
-#define PM_SUSPEND_MODE_STD		0
-#define PM_SUSPEND_MODE_POWER_OFF	1
-
 DEFINE_BAKERY_LOCK(pm_client_secure_lock);
 
 extern const struct pm_ipi apu_ipi;
 
-const struct pm_ipi apu_ipi = {
-	.local_ipi_id = IPI_ID_APU,
-	.remote_ipi_id = IPI_ID_PMU0,
-	.buffer_base = IPI_BUFFER_APU_BASE,
-};
-
-static uint32_t suspend_mode = PM_SUSPEND_MODE_STD;
-
 /* Order in pm_procs_all array must match cpu ids */
-static const struct pm_proc pm_procs_all[] = {
+static const struct pm_proc const pm_procs_all[] = {
 	{
 		.node_id = NODE_APU_0,
 		.pwrdn_mask = APU_0_PWRCTL_CPUPWRDWNREQ_MASK,
@@ -178,19 +164,6 @@ static void pm_client_set_wakeup_sources(void)
 	uint32_t reg_num;
 	uint8_t pm_wakeup_nodes_set[NODE_MAX];
 	uintptr_t isenabler1 = BASE_GICD_BASE + GICD_ISENABLER + 4;
-
-	/* In case of power-off suspend, only NODE_EXTERN must be set */
-	if (suspend_mode == PM_SUSPEND_MODE_POWER_OFF) {
-		enum pm_ret_status ret;
-
-		ret = pm_set_wakeup_source(NODE_APU, NODE_EXTERN, 1);
-		/**
-		 * If NODE_EXTERN could not be set as wake source, proceed with
-		 * standard suspend (no one will wake the system otherwise)
-		 */
-		if (ret == PM_RET_SUCCESS)
-			return;
-	}
 
 	zeromem(&pm_wakeup_nodes_set, sizeof(pm_wakeup_nodes_set));
 
@@ -331,14 +304,4 @@ void pm_client_wakeup(const struct pm_proc *proc)
 	mmio_write_32(APU_PWRCTL, val);
 
 	bakery_lock_release(&pm_client_secure_lock);
-}
-
-enum pm_ret_status pm_set_suspend_mode(uint32_t mode)
-{
-	if ((mode != PM_SUSPEND_MODE_STD) &&
-	    (mode != PM_SUSPEND_MODE_POWER_OFF))
-		return PM_RET_ERROR_ARGS;
-
-	suspend_mode = mode;
-	return PM_RET_SUCCESS;
 }

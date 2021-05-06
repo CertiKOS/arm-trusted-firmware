@@ -1,12 +1,11 @@
 /*
- * Copyright (c) 2013-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <arch_helpers.h>
-#include "../bl1_private.h"
 
 /*******************************************************************************
  * Function that does the first bit of architectural setup that affects
@@ -23,7 +22,7 @@ void bl1_arch_setup(void)
  ******************************************************************************/
 void bl1_arch_next_el_setup(void)
 {
-	u_register_t next_sctlr;
+	unsigned long next_sctlr;
 
 	/* Use the same endianness than the current BL */
 	next_sctlr = (read_sctlr_el3() & SCTLR_EE_BIT);

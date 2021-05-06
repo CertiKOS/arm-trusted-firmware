@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef HISI_IPC_H
-#define HISI_IPC_H
+#ifndef __HISI_IPC_H__
+#define __HISI_IPC_H__
 
 enum pm_mode {
 	PM_ON = 0,
@@ -21,4 +21,4 @@ void hisi_ipc_psci_system_reset(unsigned int core, unsigned int cluster,
 				unsigned int cmd_id);
 int hisi_ipc_init(void);
 
-#endif /* HISI_IPC_H */
+#endif /* __HISI_IPC_H__ */

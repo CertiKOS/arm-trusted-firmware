@@ -1,28 +1,22 @@
 /*
- * Copyright (c) 2017-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <drivers/console.h>
-#include <drivers/delay_timer.h>
-#include <lib/mmio.h>
-
-#include <ddr_parameter.h>
+#include <console.h>
+#include <debug.h>
+#include <delay_timer.h>
+#include <mmio.h>
+#include <platform_def.h>
 #include <plat_private.h>
+#include <ddr_parameter.h>
 #include <rk3328_def.h>
 #include <soc.h>
 
 /* Table of regions to map using the MMU. */
 const mmap_region_t plat_rk_mmap[] = {
-	MAP_REGION_FLAT(UART0_BASE, UART0_SIZE,
-			MT_DEVICE | MT_RW | MT_SECURE),
-	MAP_REGION_FLAT(UART1_BASE, UART1_SIZE,
-			MT_DEVICE | MT_RW | MT_SECURE),
 	MAP_REGION_FLAT(UART2_BASE, UART2_SIZE,
 			MT_DEVICE | MT_RW | MT_SECURE),
 	MAP_REGION_FLAT(PMU_BASE, PMU_SIZE,
@@ -97,7 +91,6 @@ void secure_timer_init(void)
 
 void sgrf_init(void)
 {
-#ifdef PLAT_RK_SECURE_DDR_MINILOADER
 	uint32_t i, val;
 	struct param_ddr_usage usg;
 
@@ -116,7 +109,6 @@ void sgrf_init(void)
 			      FIREWALL_DDR_FW_DDR_RGN(7 - i),
 			      RG_MAP_SECURE(usg.s_top[i], usg.s_base[i]));
 	}
-#endif
 
 	/* set ddr rgn0_top and rga0_top as 0 */
 	mmio_write_32(FIREWALL_DDR_BASE + FIREWALL_DDR_FW_DDR_RGN(0), 0x0);

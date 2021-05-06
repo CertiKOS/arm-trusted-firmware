@@ -3,29 +3,26 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/arm/cci.h>
-#include <drivers/console.h>
-#include <lib/mmio.h>
-#include <lib/smccc.h>
-#include <lib/xlat_tables/xlat_tables.h>
-#include <plat/common/platform.h>
-#include <services/arm_arch_svc.h>
-
+#include <arm_gic.h>
+#include <bl_common.h>
+#include <cci.h>
+#include <console.h>
+#include <debug.h>
+#include <mmio.h>
 #include <mtk_plat_common.h>
 #include <mtk_sip_svc.h>
+#include <platform.h>
 #include <plat_private.h>
+#include <xlat_tables.h>
 
 struct atf_arg_t gteearg;
 
 void clean_top_32b_of_param(uint32_t smc_fid,
-				u_register_t *px1,
-				u_register_t *px2,
-				u_register_t *px3,
-				u_register_t *px4)
+				uint64_t *px1,
+				uint64_t *px2,
+				uint64_t *px3,
+				uint64_t *px4)
 {
 	/* if parameters from SMC32. Clean top 32 bits */
 	if (0 == (smc_fid & SMC_AARCH64_BIT)) {
@@ -117,34 +114,4 @@ uint32_t plat_get_spsr_for_bl33_entry(void)
 
 	spsr = SPSR_MODE32(mode, 0, ee, daif);
 	return spsr;
-}
-
-/*****************************************************************************
- * plat_is_smccc_feature_available() - This function checks whether SMCCC
- *                                     feature is availabile for platform.
- * @fid: SMCCC function id
- *
- * Return SMC_OK if SMCCC feature is available and SMC_ARCH_CALL_NOT_SUPPORTED
- * otherwise.
- *****************************************************************************/
-int32_t plat_is_smccc_feature_available(u_register_t fid)
-{
-	switch (fid) {
-	case SMCCC_ARCH_SOC_ID:
-		return SMC_ARCH_CALL_SUCCESS;
-	default:
-		return SMC_ARCH_CALL_NOT_SUPPORTED;
-	}
-}
-
-int32_t plat_get_soc_version(void)
-{
-	uint32_t manfid = (JEDEC_MTK_BKID << 24U) | (JEDEC_MTK_MFID << 16U);
-
-	return (int32_t)(manfid | (SOC_CHIP_ID & 0xFFFFU));
-}
-
-int32_t plat_get_soc_revision(void)
-{
-	return 0;
 }

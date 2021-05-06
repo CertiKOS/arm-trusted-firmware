@@ -5,18 +5,19 @@
  */
 
 /* convoluted way to make sure that the define is pasted just the right way */
-#define INCBIN(file, sym, sec) \
+#define _INCBIN(file, sym) \
 	__asm__( \
-		".section " sec "\n" \
-		".global " sym "\n" \
-		".type " sym ", %object\n" \
+		".section .sram.incbin\n" \
+		".global " #sym "\n" \
+		".type " #sym ", %object\n" \
 		".align 4\n" \
-		sym ":\n" \
-		".incbin \"" file "\"\n" \
-		".size " sym ", .-" sym "\n" \
-		".global " sym "_end\n" \
-		sym "_end:\n" \
+		#sym ":\n" \
+		".incbin \"" #file "\"\n" \
+		".size " #sym ", .-" #sym "\n" \
+		".global " #sym "_end\n" \
+		#sym "_end:\n" \
 	)
 
-INCBIN(RK3399M0FW, "rk3399m0_bin", ".sram.incbin");
-INCBIN(RK3399M0PMUFW, "rk3399m0pmu_bin", ".pmusram.incbin");
+#define INCBIN(file, sym) _INCBIN(file, sym)
+
+INCBIN(RK3399M0FW, rk3399m0_bin);

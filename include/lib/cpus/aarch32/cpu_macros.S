@@ -3,15 +3,11 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef CPU_MACROS_S
-#define CPU_MACROS_S
+#ifndef __CPU_MACROS_S__
+#define __CPU_MACROS_S__
 
 #include <arch.h>
-#include <lib/cpus/errata_report.h>
-
-#if defined(IMAGE_BL1) || defined(IMAGE_BL32)  || (defined(IMAGE_BL2) && BL2_AT_EL3)
-#define IMAGE_AT_EL3
-#endif
+#include <errata_report.h>
 
 #define CPU_IMPL_PN_MASK	(MIDR_IMPL_MASK << MIDR_IMPL_SHIFT) | \
 				(MIDR_PN_MASK << MIDR_PN_SHIFT)
@@ -133,7 +129,7 @@
 	.align 2
 	.type cpu_ops_\_name, %object
 	.word \_midr
-#if defined(IMAGE_AT_EL3)
+#if defined(IMAGE_BL1) || defined(IMAGE_BL32)
 	.word \_resetfunc
 #endif
 #ifdef IMAGE_BL32
@@ -161,9 +157,10 @@
 	.endif
 
 	/*
-	 * Mandatory errata status printing function for CPUs of
+	 * Weakly-bound, optional errata status printing function for CPUs of
 	 * this class.
 	 */
+	.weak \_name\()_errata_report
 	.word \_name\()_errata_report
 
 #ifdef IMAGE_BL32
@@ -213,18 +210,5 @@
 	bl	errata_print_msg
 	.endm
 #endif
-	/*
-	 * Helper macro that reads the part number of the current CPU and jumps
-	 * to the given label if it matches the CPU MIDR provided.
-	 *
-	 * Clobbers: r0-r1
-	 */
-	.macro  jump_if_cpu_midr _cpu_midr, _label
-	ldcopr	r0, MIDR
-	ubfx	r0, r0, #MIDR_PN_SHIFT, #12
-	ldr	r1, =((\_cpu_midr >> MIDR_PN_SHIFT) & MIDR_PN_MASK)
-	cmp	r0, r1
-	beq	\_label
-	.endm
 
-#endif /* CPU_MACROS_S */
+#endif /* __CPU_MACROS_S__ */

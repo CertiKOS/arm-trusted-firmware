@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef MCE_PRIVATE_H
-#define MCE_PRIVATE_H
+#ifndef __MCE_PRIVATE_H__
+#define __MCE_PRIVATE_H__
 
-#include <lib/mmio.h>
-
+#include <mmio.h>
 #include <tegra_def.h>
 
 /*******************************************************************************
@@ -257,4 +256,4 @@ int32_t nvg_cc3_ctrl(uint32_t ari_base, uint32_t freq, uint32_t volt, uint8_t en
 extern void nvg_set_request_data(uint64_t req, uint64_t data);
 extern void nvg_set_request(uint64_t req);
 extern uint64_t nvg_get_result(void);
-#endif /* MCE_PRIVATE_H */
+#endif /* __MCE_PRIVATE_H__ */

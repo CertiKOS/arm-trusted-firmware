@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef HI6220_REGS_PERI_H
-#define HI6220_REGS_PERI_H
+#ifndef __HI6220_PERI_H__
+#define __HI6220_PERI_H__
 
 #define PERI_BASE				0xF7030000
 
@@ -134,7 +134,7 @@
 #define PERI_CTRL4_OTG_SESSEND			(1 << 28)
 #define PERI_CTRL4_OTG_BVALID			(1 << 29)
 #define PERI_CTRL4_OTG_AVALID			(1 << 30)
-#define PERI_CTRL4_OTG_VBUSVALID		(1U << 31)
+#define PERI_CTRL4_OTG_VBUSVALID		(1 << 31)
 
 /* PERI_SC_PERIPH_CTRL5 */
 #define PERI_CTRL5_USBOTG_RES_SEL		(1 << 3)
@@ -377,4 +377,4 @@
 #define PERI_RST8_DDRPACK_APB			(1 << 14)
 #define PERI_RST8_DDRT				(1 << 17)
 
-#endif /* HI6220_REGS_PERI_H */
+#endif /* __HI6220_PERI_H__ */

@@ -1,13 +1,15 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef KEY_H
-#define KEY_H
+#ifndef KEY_H_
+#define KEY_H_
 
 #include <openssl/ossl_typ.h>
+
+#define RSA_KEY_BITS		2048
 
 /* Error codes */
 enum {
@@ -20,30 +22,11 @@ enum {
 
 /* Supported key algorithms */
 enum {
-	KEY_ALG_RSA,		/* RSA PSS as defined by PKCS#1 v2.1 (default) */
+	KEY_ALG_RSA,
 #ifndef OPENSSL_NO_EC
 	KEY_ALG_ECDSA,
 #endif /* OPENSSL_NO_EC */
 	KEY_ALG_MAX_NUM
-};
-
-/* Maximum number of valid key sizes per algorithm */
-#define KEY_SIZE_MAX_NUM	4
-
-/* Supported hash algorithms */
-enum{
-	HASH_ALG_SHA256,
-	HASH_ALG_SHA384,
-	HASH_ALG_SHA512,
-};
-
-/* Supported key sizes */
-/* NOTE: the first item in each array is the default key size */
-static const unsigned int KEY_SIZES[KEY_ALG_MAX_NUM][KEY_SIZE_MAX_NUM] = {
-	{ 2048, 1024, 3072, 4096 },	/* KEY_ALG_RSA */
-#ifndef OPENSSL_NO_EC
-	{}				/* KEY_ALG_ECDSA */
-#endif /* OPENSSL_NO_EC */
 };
 
 /*
@@ -67,26 +50,17 @@ typedef struct key_s {
 int key_init(void);
 key_t *key_get_by_opt(const char *opt);
 int key_new(key_t *key);
-int key_create(key_t *key, int type, int key_bits);
+int key_create(key_t *key, int type);
 int key_load(key_t *key, unsigned int *err_code);
 int key_store(key_t *key);
 
 /* Macro to register the keys used in the CoT */
 #define REGISTER_KEYS(_keys) \
-	key_t *def_keys = &_keys[0]; \
-	const unsigned int num_def_keys = sizeof(_keys)/sizeof(_keys[0])
-
-/* Macro to register the platform defined keys used in the CoT */
-#define PLAT_REGISTER_KEYS(_pdef_keys) \
-	key_t *pdef_keys = &_pdef_keys[0]; \
-	const unsigned int num_pdef_keys = sizeof(_pdef_keys)/sizeof(_pdef_keys[0])
+	key_t *keys = &_keys[0]; \
+	const unsigned int num_keys = sizeof(_keys)/sizeof(_keys[0])
 
 /* Exported variables */
-extern key_t *def_keys;
-extern const unsigned int num_def_keys;
-extern key_t *pdef_keys;
-extern const unsigned int num_pdef_keys;
-
 extern key_t *keys;
-extern unsigned int num_keys;
-#endif /* KEY_H */
+extern const unsigned int num_keys;
+
+#endif /* KEY_H_ */

@@ -4,19 +4,18 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <stdint.h>
-
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/pmf/pmf.h>
-#include <tools_share/uuid.h>
-
 #include <hisi_sip_svc.h>
+#include <debug.h>
+#include <pmf.h>
+#include <runtime_svc.h>
+#include <stdint.h>
+#include <uuid.h>
+
 
 /* Hisi SiP Service UUID */
-DEFINE_SVC_UUID2(hisi_sip_svc_uid,
-	0x74df99e5, 0x8276, 0xaa40, 0x9f, 0xf8,
-	0xc0, 0x85, 0x52, 0xbc, 0x39, 0x3f);
+DEFINE_SVC_UUID(hisi_sip_svc_uid,
+		0xe599df74, 0x7682, 0x40aa, 0x9f, 0xf8,
+		0xc0, 0x85, 0x52, 0xbc, 0x39, 0x3f);
 
 static int hisi_sip_setup(void)
 {

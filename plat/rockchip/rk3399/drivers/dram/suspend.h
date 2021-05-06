@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef SUSPEND_H
-#define SUSPEND_H
-
+#ifndef __SOC_ROCKCHIP_RK3399_SUSPEND_H__
+#define __SOC_ROCKCHIP_RK3399_SUSPEND_H__
 #include <dram.h>
 
 #define KHz (1000)
@@ -20,7 +19,7 @@
 #define PI_WDQ_LEVELING		(1 << 4)
 #define PI_FULL_TRAINING	(0xff)
 
-void dmc_suspend(void);
-__pmusramfunc void dmc_resume(void);
+void dmc_save(void);
+__pmusramfunc void dmc_restore(void);
 
-#endif /* SUSPEND_H */
+#endif /* __DRAM_H__ */

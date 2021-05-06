@@ -1,13 +1,11 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef UART_16550_H
-#define UART_16550_H
-
-#include <drivers/console.h>
+#ifndef __UART_16550_H__
+#define __UART_16550_H__
 
 /* UART16550 Registers */
 #define UARTTX			0x0
@@ -23,8 +21,6 @@
 #define UARTMSR			0x18
 #define UARTSPR			0x1c
 #define UARTCSR			0x20
-/* Some instances have MDR1 defined as well */
-#define UARTMDR1		0x20
 #define UARTRXFIFOCFG		0x24
 #define UARTMIE			0x28
 #define UARTVNDR		0x2c
@@ -71,24 +67,4 @@
 #define UARTLSR_RDR_BIT		(0)		/* Rx Data Ready Bit */
 #define UARTLSR_RDR		(1 << UARTLSR_RDR_BIT)	/* Rx Data Ready */
 
-#ifndef __ASSEMBLER__
-
-#include <stdint.h>
-
-/*
- * Initialize a new 16550 console instance and register it with the console
- * framework. The |console| pointer must point to storage that will be valid
- * for the lifetime of the console, such as a global or static local variable.
- * Its contents will be reinitialized from scratch.
- * When |clock| has a value of 0, the UART will *not* be initialised. This
- * means the UART should already be enabled and the baudrate and clock setup
- * should have been done already, either by platform specific code or by
- * previous firmware stages. The |baud| parameter will be ignored in this
- * case as well.
- */
-int console_16550_register(uintptr_t baseaddr, uint32_t clock, uint32_t baud,
-			   console_t *console);
-
-#endif /*__ASSEMBLER__*/
-
-#endif /* UART_16550_H */
+#endif	/* __UART_16550_H__ */

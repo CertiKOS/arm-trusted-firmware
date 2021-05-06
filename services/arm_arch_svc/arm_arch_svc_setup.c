@@ -1,97 +1,72 @@
 /*
- * Copyright (c) 2018-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/cpus/errata_report.h>
-#include <lib/cpus/wa_cve_2017_5715.h>
-#include <lib/cpus/wa_cve_2018_3639.h>
-#include <lib/smccc.h>
-#include <services/arm_arch_svc.h>
+#include <arch_helpers.h>
+#include <arm_arch_svc.h>
+#include <debug.h>
+#include <errata_report.h>
+#include <runtime_svc.h>
+#include <smccc.h>
 #include <smccc_helpers.h>
-#include <plat/common/platform.h>
+#include <wa_cve_2017_5715.h>
+#include <wa_cve_2018_3639.h>
 
-static int32_t smccc_version(void)
+static uint32_t smccc_version(void)
 {
 	return MAKE_SMCCC_VERSION(SMCCC_MAJOR_VERSION, SMCCC_MINOR_VERSION);
 }
 
-static int32_t smccc_arch_features(u_register_t arg1)
+static int32_t smccc_arch_features(u_register_t arg)
 {
-	switch (arg1) {
+	int32_t ret;
+
+	switch (arg) {
 	case SMCCC_VERSION:
 	case SMCCC_ARCH_FEATURES:
-		return SMC_ARCH_CALL_SUCCESS;
-	case SMCCC_ARCH_SOC_ID:
-		return plat_is_smccc_feature_available(arg1);
+		ret = (int32_t)SMC_OK;
+		break;
 #if WORKAROUND_CVE_2017_5715
 	case SMCCC_ARCH_WORKAROUND_1:
-		if (check_wa_cve_2017_5715() == ERRATA_NOT_APPLIES)
-			return 1;
-		return 0; /* ERRATA_APPLIES || ERRATA_MISSING */
+		if (check_wa_cve_2017_5715() == ERRATA_NOT_APPLIES) {
+			ret = 1;
+		} else {
+			ret = 0; /* ERRATA_APPLIES || ERRATA_MISSING */
+		}
+		break;
 #endif
-
 #if WORKAROUND_CVE_2018_3639
-	case SMCCC_ARCH_WORKAROUND_2: {
+	case SMCCC_ARCH_WORKAROUND_2:
 #if DYNAMIC_WORKAROUND_CVE_2018_3639
-		unsigned long long ssbs;
-
-		/*
-		 * Firmware doesn't have to carry out dynamic workaround if the
-		 * PE implements architectural Speculation Store Bypass Safe
-		 * (SSBS) feature.
-		 */
-		ssbs = (read_id_aa64pfr1_el1() >> ID_AA64PFR1_EL1_SSBS_SHIFT) &
-			ID_AA64PFR1_EL1_SSBS_MASK;
-
-		/*
-		 * If architectural SSBS is available on this PE, no firmware
-		 * mitigation via SMCCC_ARCH_WORKAROUND_2 is required.
-		 */
-		if (ssbs != SSBS_UNAVAILABLE)
-			return 1;
-
 		/*
 		 * On a platform where at least one CPU requires
 		 * dynamic mitigation but others are either unaffected
 		 * or permanently mitigated, report the latter as not
 		 * needing dynamic mitigation.
 		 */
-		if (wa_cve_2018_3639_get_disable_ptr() == NULL)
-			return 1;
-		/*
-		 * If we get here, this CPU requires dynamic mitigation
-		 * so report it as such.
-		 */
-		return 0;
+		if (wa_cve_2018_3639_get_disable_ptr() == NULL) {
+			ret = 1;
+		} else {
+			/*
+			 * If we get here, this CPU requires dynamic mitigation
+			 * so report it as such.
+			 */
+			ret = 0;
+		}
 #else
 		/* Either the CPUs are unaffected or permanently mitigated */
-		return SMC_ARCH_CALL_NOT_REQUIRED;
+		ret = SMCCC_ARCH_NOT_REQUIRED;
 #endif
-	}
+		break;
 #endif
-
-	/* Fallthrough */
-
 	default:
-		return SMC_UNK;
+		ret = SMC_UNK;
+		break;
 	}
-}
 
-/* return soc revision or soc version on success otherwise
- * return invalid parameter */
-static int32_t smccc_arch_id(u_register_t arg1)
-{
-	if (arg1 == SMCCC_GET_SOC_REVISION) {
-		return plat_get_soc_revision();
-	}
-	if (arg1 == SMCCC_GET_SOC_VERSION) {
-		return plat_get_soc_version();
-	}
-	return SMC_ARCH_CALL_INVAL_PARAM;
+	return ret;
 }
 
 /*
@@ -108,11 +83,11 @@ static uintptr_t arm_arch_svc_smc_handler(uint32_t smc_fid,
 {
 	switch (smc_fid) {
 	case SMCCC_VERSION:
-		SMC_RET1(handle, smccc_version());
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), ((uint64_t)smccc_version()));
+		break;
 	case SMCCC_ARCH_FEATURES:
-		SMC_RET1(handle, smccc_arch_features(x1));
-	case SMCCC_ARCH_SOC_ID:
-		SMC_RET1(handle, smccc_arch_id(x1));
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), ((uint64_t)smccc_arch_features(x1)));
+		break;
 #if WORKAROUND_CVE_2017_5715
 	case SMCCC_ARCH_WORKAROUND_1:
 		/*
@@ -120,7 +95,8 @@ static uintptr_t arm_arch_svc_smc_handler(uint32_t smc_fid,
 		 * during entry to EL3.  On unaffected PEs, this function
 		 * has no effect.
 		 */
-		SMC_RET0(handle);
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (0));
+		break;
 #endif
 #if WORKAROUND_CVE_2018_3639
 	case SMCCC_ARCH_WORKAROUND_2:
@@ -130,21 +106,25 @@ static uintptr_t arm_arch_svc_smc_handler(uint32_t smc_fid,
 		 * On unaffected or statically mitigated PEs, this function
 		 * has no effect.
 		 */
-		SMC_RET0(handle);
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (0));
+		break;
 #endif
 	default:
 		WARN("Unimplemented Arm Architecture Service Call: 0x%x \n",
 			smc_fid);
-		SMC_RET1(handle, SMC_UNK);
+		write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), ((uint64_t)SMC_UNK));
+		break;
 	}
+
+	return SMC_OK;
 }
 
 /* Register Standard Service Calls as runtime service */
 DECLARE_RT_SVC(
 		arm_arch_svc,
-		OEN_ARM_START,
-		OEN_ARM_END,
-		SMC_TYPE_FAST,
-		NULL,
-		arm_arch_svc_smc_handler
+		(OEN_ARM_START),
+		(OEN_ARM_END),
+		(uint8_t)(SMC_TYPE_FAST),
+		(NULL),
+		(arm_arch_svc_smc_handler)
 );

@@ -5,14 +5,12 @@
  */
 
 #include <stdint.h>
-
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <lib/mmio.h>
-#include <plat/common/platform.h>
-
+#include <mmio.h>
 #include <mt_cpuxgpt.h>
-
+#include <stdint.h>
+#include <platform.h>
+#include <debug.h>
 #define CPUXGPT_BASE	0x10200000
 #define INDEX_BASE		(CPUXGPT_BASE+0x0674)
 #define CTL_BASE		(CPUXGPT_BASE+0x0670)

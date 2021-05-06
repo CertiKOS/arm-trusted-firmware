@@ -1,29 +1,73 @@
 /*
- * Copyright (c) 2014-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <stdint.h>
-
-#include <platform_def.h>
-
 #include <arch.h>
-#include <arch_features.h>
-#include <common/bl_common.h>
-#include <lib/utils.h>
-#include <lib/xlat_tables/xlat_tables.h>
-#include <lib/xlat_tables/xlat_tables_arch.h>
-#include <plat/common/common_def.h>
-
+#include <arch_helpers.h>
+#include <assert.h>
+#include <bl_common.h>
+#include <cassert.h>
+#include <common_def.h>
+#include <platform_def.h>
+#include <sys/types.h>
+#include <utils.h>
+#include <xlat_tables.h>
 #include "../xlat_tables_private.h"
 
-#define XLAT_TABLE_LEVEL_BASE	\
-       GET_XLAT_TABLE_LEVEL_BASE(PLAT_VIRT_ADDR_SPACE_SIZE)
+/*
+ * Each platform can define the size of the virtual address space, which is
+ * defined in PLAT_VIRT_ADDR_SPACE_SIZE. TCR.TxSZ is calculated as 64 minus the
+ * width of said address space. The value of TCR.TxSZ must be in the range 16
+ * to 39 [1], which means that the virtual address space width must be in the
+ * range 48 to 25 bits.
+ *
+ * Here we calculate the initial lookup level from the value of
+ * PLAT_VIRT_ADDR_SPACE_SIZE. For a 4 KB page size, level 0 supports virtual
+ * address spaces of widths 48 to 40 bits, level 1 from 39 to 31, and level 2
+ * from 30 to 25. Wider or narrower address spaces are not supported. As a
+ * result, level 3 cannot be used as initial lookup level with 4 KB
+ * granularity. [2]
+ *
+ * For example, for a 35-bit address space (i.e. PLAT_VIRT_ADDR_SPACE_SIZE ==
+ * 1 << 35), TCR.TxSZ will be programmed to (64 - 35) = 29. According to Table
+ * D4-11 in the ARM ARM, the initial lookup level for an address space like
+ * that is 1.
+ *
+ * See the ARMv8-A Architecture Reference Manual (DDI 0487A.j) for more
+ * information:
+ * [1] Page 1730: 'Input address size', 'For all translation stages'.
+ * [2] Section D4.2.5
+ */
 
-#define NUM_BASE_LEVEL_ENTRIES	\
-       GET_NUM_BASE_LEVEL_ENTRIES(PLAT_VIRT_ADDR_SPACE_SIZE)
+#if PLAT_VIRT_ADDR_SPACE_SIZE > (1ULL << (64 - TCR_TxSZ_MIN))
+
+# error "PLAT_VIRT_ADDR_SPACE_SIZE is too big."
+
+#elif PLAT_VIRT_ADDR_SPACE_SIZE > (1ULL << L0_XLAT_ADDRESS_SHIFT)
+
+# define XLAT_TABLE_LEVEL_BASE	0
+# define NUM_BASE_LEVEL_ENTRIES	\
+		(PLAT_VIRT_ADDR_SPACE_SIZE >> L0_XLAT_ADDRESS_SHIFT)
+
+#elif PLAT_VIRT_ADDR_SPACE_SIZE > (1 << L1_XLAT_ADDRESS_SHIFT)
+
+# define XLAT_TABLE_LEVEL_BASE	1
+# define NUM_BASE_LEVEL_ENTRIES	\
+		(PLAT_VIRT_ADDR_SPACE_SIZE >> L1_XLAT_ADDRESS_SHIFT)
+
+#elif PLAT_VIRT_ADDR_SPACE_SIZE >= (1 << (64 - TCR_TxSZ_MAX))
+
+# define XLAT_TABLE_LEVEL_BASE	2
+# define NUM_BASE_LEVEL_ENTRIES	\
+		(PLAT_VIRT_ADDR_SPACE_SIZE >> L2_XLAT_ADDRESS_SHIFT)
+
+#else
+
+# error "PLAT_VIRT_ADDR_SPACE_SIZE is too small."
+
+#endif
 
 static uint64_t base_xlation_table[NUM_BASE_LEVEL_ENTRIES]
 		__aligned(NUM_BASE_LEVEL_ENTRIES * sizeof(uint64_t));
@@ -34,39 +78,36 @@ static unsigned long long calc_physical_addr_size_bits(
 					unsigned long long max_addr)
 {
 	/* Physical address can't exceed 48 bits */
-	assert((max_addr & ADDR_MASK_48_TO_63) == 0U);
+	assert((max_addr & ADDR_MASK_48_TO_63) == 0);
 
 	/* 48 bits address */
-	if ((max_addr & ADDR_MASK_44_TO_47) != 0U)
+	if (max_addr & ADDR_MASK_44_TO_47)
 		return TCR_PS_BITS_256TB;
 
 	/* 44 bits address */
-	if ((max_addr & ADDR_MASK_42_TO_43) != 0U)
+	if (max_addr & ADDR_MASK_42_TO_43)
 		return TCR_PS_BITS_16TB;
 
 	/* 42 bits address */
-	if ((max_addr & ADDR_MASK_40_TO_41) != 0U)
+	if (max_addr & ADDR_MASK_40_TO_41)
 		return TCR_PS_BITS_4TB;
 
 	/* 40 bits address */
-	if ((max_addr & ADDR_MASK_36_TO_39) != 0U)
+	if (max_addr & ADDR_MASK_36_TO_39)
 		return TCR_PS_BITS_1TB;
 
 	/* 36 bits address */
-	if ((max_addr & ADDR_MASK_32_TO_35) != 0U)
+	if (max_addr & ADDR_MASK_32_TO_35)
 		return TCR_PS_BITS_64GB;
 
 	return TCR_PS_BITS_4GB;
 }
 
 #if ENABLE_ASSERTIONS
-/*
- * Physical Address ranges supported in the AArch64 Memory Model. Value 0b110 is
- * supported in ARMv8.2 onwards.
- */
+/* Physical Address ranges supported in the AArch64 Memory Model */
 static const unsigned int pa_range_bits_arr[] = {
 	PARANGE_0000, PARANGE_0001, PARANGE_0010, PARANGE_0011, PARANGE_0100,
-	PARANGE_0101, PARANGE_0110
+	PARANGE_0101
 };
 
 static unsigned long long get_max_supported_pa(void)
@@ -79,38 +120,23 @@ static unsigned long long get_max_supported_pa(void)
 
 	return (1ULL << pa_range_bits_arr[pa_range]) - 1ULL;
 }
-
-/*
- * Return minimum virtual address space size supported by the architecture
- */
-static uintptr_t xlat_get_min_virt_addr_space_size(void)
-{
-	uintptr_t ret;
-
-	if (is_armv8_4_ttst_present())
-		ret = MIN_VIRT_ADDR_SPACE_SIZE_TTST;
-	else
-		ret = MIN_VIRT_ADDR_SPACE_SIZE;
-
-	return ret;
-}
 #endif /* ENABLE_ASSERTIONS */
 
-unsigned int xlat_arch_current_el(void)
+int xlat_arch_current_el(void)
 {
-	unsigned int el = (unsigned int)GET_EL(read_CurrentEl());
+	int el = GET_EL(read_CurrentEl());
 
-	assert(el > 0U);
+	assert(el > 0);
 
 	return el;
 }
 
-uint64_t xlat_arch_get_xn_desc(unsigned int el)
+uint64_t xlat_arch_get_xn_desc(int el)
 {
-	if (el == 3U) {
+	if (el == 3) {
 		return UPPER_ATTRS(XN);
 	} else {
-		assert(el == 1U);
+		assert(el == 1);
 		return UPPER_ATTRS(PXN);
 	}
 }
@@ -119,19 +145,13 @@ void init_xlat_tables(void)
 {
 	unsigned long long max_pa;
 	uintptr_t max_va;
-
-	assert(PLAT_VIRT_ADDR_SPACE_SIZE >=
-		(xlat_get_min_virt_addr_space_size() - 1U));
-	assert(PLAT_VIRT_ADDR_SPACE_SIZE <= MAX_VIRT_ADDR_SPACE_SIZE);
-	assert(IS_POWER_OF_TWO(PLAT_VIRT_ADDR_SPACE_SIZE));
-
 	print_mmap();
-	init_xlation_table(0U, base_xlation_table, XLAT_TABLE_LEVEL_BASE,
+	init_xlation_table(0, base_xlation_table, XLAT_TABLE_LEVEL_BASE,
 			   &max_va, &max_pa);
 
-	assert(max_va <= (PLAT_VIRT_ADDR_SPACE_SIZE - 1U));
-	assert(max_pa <= (PLAT_PHY_ADDR_SPACE_SIZE - 1U));
-	assert((PLAT_PHY_ADDR_SPACE_SIZE - 1U) <= get_max_supported_pa());
+	assert(max_va <= PLAT_VIRT_ADDR_SPACE_SIZE - 1);
+	assert(max_pa <= PLAT_PHY_ADDR_SPACE_SIZE - 1);
+	assert((PLAT_PHY_ADDR_SPACE_SIZE - 1) <= get_max_supported_pa());
 
 	tcr_ps_bits = calc_physical_addr_size_bits(max_pa);
 }
@@ -153,7 +173,7 @@ void init_xlat_tables(void)
 		uint32_t sctlr;						\
 									\
 		assert(IS_IN_EL(_el));					\
-		assert((read_sctlr_el##_el() & SCTLR_M_BIT) == 0U);	\
+		assert((read_sctlr_el##_el() & SCTLR_M_BIT) == 0);	\
 									\
 		/* Set attributes in the right indices of the MAIR */	\
 		mair = MAIR_ATTR_SET(ATTR_DEVICE, ATTR_DEVICE_INDEX);	\
@@ -168,18 +188,16 @@ void init_xlat_tables(void)
 									\
 		/* Set TCR bits as well. */				\
 		/* Set T0SZ to (64 - width of virtual address space) */	\
-		int t0sz = 64 - __builtin_ctzll(PLAT_VIRT_ADDR_SPACE_SIZE);\
-									\
-		if ((flags & XLAT_TABLE_NC) != 0U) {			\
+		if (flags & XLAT_TABLE_NC) {				\
 			/* Inner & outer non-cacheable non-shareable. */\
 			tcr = TCR_SH_NON_SHAREABLE |			\
 				TCR_RGN_OUTER_NC | TCR_RGN_INNER_NC |	\
-				((uint64_t)t0sz << TCR_T0SZ_SHIFT);	\
+				(64 - __builtin_ctzl(PLAT_VIRT_ADDR_SPACE_SIZE));\
 		} else {						\
 			/* Inner & outer WBWA & shareable. */		\
 			tcr = TCR_SH_INNER_SHAREABLE |			\
 				TCR_RGN_OUTER_WBA | TCR_RGN_INNER_WBA |	\
-				((uint64_t)t0sz << TCR_T0SZ_SHIFT);	\
+				(64 - __builtin_ctzl(PLAT_VIRT_ADDR_SPACE_SIZE));\
 		}							\
 		tcr |= _tcr_extra;					\
 		write_tcr_el##_el(tcr);					\
@@ -198,7 +216,7 @@ void init_xlat_tables(void)
 		sctlr = read_sctlr_el##_el();				\
 		sctlr |= SCTLR_WXN_BIT | SCTLR_M_BIT;			\
 									\
-		if ((flags & DISABLE_DCACHE) != 0U)			\
+		if (flags & DISABLE_DCACHE)				\
 			sctlr &= ~SCTLR_C_BIT;				\
 		else							\
 			sctlr |= SCTLR_C_BIT;				\
@@ -207,20 +225,11 @@ void init_xlat_tables(void)
 									\
 		/* Ensure the MMU enable takes effect immediately */	\
 		isb();							\
-	}								\
-									\
-	void enable_mmu_direct_el##_el(unsigned int flags)		\
-	{								\
-		enable_mmu_el##_el(flags);				\
 	}
 
 /* Define EL1 and EL3 variants of the function enabling the MMU */
 DEFINE_ENABLE_MMU_EL(1,
-		/*
-		 * TCR_EL1.EPD1: Disable translation table walk for addresses
-		 * that are translated using TTBR1_EL1.
-		 */
-		TCR_EPD1_BIT | (tcr_ps_bits << TCR_EL1_IPS_SHIFT),
+		(tcr_ps_bits << TCR_EL1_IPS_SHIFT),
 		tlbivmalle1)
 DEFINE_ENABLE_MMU_EL(3,
 		TCR_EL3_RES1 | (tcr_ps_bits << TCR_EL3_PS_SHIFT),

@@ -12,7 +12,6 @@ ARCH		:= cortex-m0
 
 # Build platform
 PLAT_M0		?= rk3399m0
-PLAT_M0_PMU	?= rk3399m0pmu
 
 ifeq (${V},0)
 	Q=@
@@ -27,10 +26,11 @@ INCLUDES		+= -Iinclude/ \
 			   -I../../include/shared/
 
 # NOTE: Add C source files here
-C_SOURCES_COMMON	:= src/startup.c
-C_SOURCES		:= src/dram.c	\
+C_SOURCES		:= src/startup.c \
+			   src/main.c	\
+			   src/suspend.c \
+			   src/dram.c	\
 			   src/stopwatch.c
-C_SOURCES_PMU		:= src/suspend.c
 
 # Flags definition
 COMMON_FLAGS		:= -g -mcpu=$(ARCH) -mthumb -Wall -O3 -nostdlib -mfloat-abi=soft
@@ -54,19 +54,12 @@ define SOURCES_TO_OBJS
 	$(notdir $(patsubst %.S,%.o,$(filter %.S,$(1))))
 endef
 
-SOURCES_COMMON		:= $(C_SOURCES_COMMON)
 SOURCES 		:= $(C_SOURCES)
-SOURCES_PMU		:= $(C_SOURCES_PMU)
-OBJS_COMMON		:= $(addprefix $(BUILD)/,$(call SOURCES_TO_OBJS,$(SOURCES_COMMON)))
 OBJS 			:= $(addprefix $(BUILD)/,$(call SOURCES_TO_OBJS,$(SOURCES)))
-OBJS_PMU 		:= $(addprefix $(BUILD)/,$(call SOURCES_TO_OBJS,$(SOURCES_PMU)))
 LINKERFILE		:= $(BUILD)/$(PLAT_M0).ld
 MAPFILE			:= $(BUILD)/$(PLAT_M0).map
-MAPFILE_PMU		:= $(BUILD)/$(PLAT_M0_PMU).map
 ELF 			:= $(BUILD)/$(PLAT_M0).elf
-ELF_PMU			:= $(BUILD)/$(PLAT_M0_PMU).elf
 BIN 			:= $(BUILD)/$(PLAT_M0).bin
-BIN_PMU			:= $(BUILD)/$(PLAT_M0_PMU).bin
 LINKERFILE_SRC		:= src/$(PLAT_M0).ld.S
 
 # Function definition related compilation
@@ -99,27 +92,18 @@ define MAKE_OBJS
 	$(and $(REMAIN),$(error Unexpected source files present: $(REMAIN)))
 endef
 
-.PHONY: all
-all: $(BIN) $(BIN_PMU)
-
-.DEFAULT_GOAL := all
+.DEFAULT_GOAL := $(BIN)
 
 $(LINKERFILE): $(LINKERFILE_SRC)
 	$(CC) $(COMMON_FLAGS) $(INCLUDES) -P -E -D__LINKER__ -MMD -MF $@.d -MT $@ -o $@ $<
 -include $(LINKERFILE).d
 
-$(ELF) : $(OBJS) $(OBJS_COMMON) $(LINKERFILE)
+$(ELF) : $(OBJS) $(LINKERFILE)
 	@echo "  LD      $@"
-	$(Q)$(CC) -o $@ $(COMMON_FLAGS) $(LDFLAGS) -Wl,-Map=$(MAPFILE) -Wl,-T$(LINKERFILE) $(OBJS) $(OBJS_COMMON)
+	$(Q)$(CC) -o $@ $(COMMON_FLAGS) $(LDFLAGS) -Wl,-Map=$(MAPFILE) -Wl,-T$(LINKERFILE) $(OBJS)
 
-%.bin : %.elf
+$(BIN) : $(ELF)
 	@echo "  BIN     $@"
 	$(Q)$(OC) -O binary $< $@
 
-$(ELF_PMU) : $(OBJS_COMMON) $(OBJS_PMU) $(LINKERFILE)
-	@echo "  LD      $@"
-	$(Q)$(CC) -o $@ $(COMMON_FLAGS) $(LDFLAGS) -Wl,-Map=$(MAPFILE_PMU) -Wl,-T$(LINKERFILE) $(OBJS_PMU) $(OBJS_COMMON)
-
-$(eval $(call MAKE_OBJS,$(BUILD),$(SOURCES_COMMON),$(1)))
 $(eval $(call MAKE_OBJS,$(BUILD),$(SOURCES),$(1)))
-$(eval $(call MAKE_OBJS,$(BUILD),$(SOURCES_PMU),$(1)))

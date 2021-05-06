@@ -1,19 +1,184 @@
 /*
- * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/debug.h>
-#include <common/interrupt_props.h>
-#include <drivers/arm/gic_common.h>
-
+#include <assert.h>
+#include <debug.h>
+#include <gic_common.h>
 #include "../common/gic_common_private.h"
 #include "gicv3_private.h"
+
+/*
+ * Accessor to read the GIC Distributor IGRPMODR corresponding to the
+ * interrupt `id`, 32 interrupt IDs at a time.
+ */
+unsigned int gicd_read_igrpmodr(uintptr_t base, unsigned int id)
+{
+	unsigned n = id >> IGRPMODR_SHIFT;
+	return mmio_read_32(base + GICD_IGRPMODR + (n << 2));
+}
+
+/*
+ * Accessor to write the GIC Distributor IGRPMODR corresponding to the
+ * interrupt `id`, 32 interrupt IDs at a time.
+ */
+void gicd_write_igrpmodr(uintptr_t base, unsigned int id, unsigned int val)
+{
+	unsigned n = id >> IGRPMODR_SHIFT;
+	mmio_write_32(base + GICD_IGRPMODR + (n << 2), val);
+}
+
+/*
+ * Accessor to get the bit corresponding to interrupt ID
+ * in GIC Distributor IGRPMODR.
+ */
+unsigned int gicd_get_igrpmodr(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGRPMODR_SHIFT) - 1);
+	unsigned int reg_val = gicd_read_igrpmodr(base, id);
+
+	return (reg_val >> bit_num) & 0x1;
+}
+
+/*
+ * Accessor to set the bit corresponding to interrupt ID
+ * in GIC Distributor IGRPMODR.
+ */
+void gicd_set_igrpmodr(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGRPMODR_SHIFT) - 1);
+	unsigned int reg_val = gicd_read_igrpmodr(base, id);
+
+	gicd_write_igrpmodr(base, id, reg_val | (1 << bit_num));
+}
+
+/*
+ * Accessor to clear the bit corresponding to interrupt ID
+ * in GIC Distributor IGRPMODR.
+ */
+void gicd_clr_igrpmodr(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGRPMODR_SHIFT) - 1);
+	unsigned int reg_val = gicd_read_igrpmodr(base, id);
+
+	gicd_write_igrpmodr(base, id, reg_val & ~(1 << bit_num));
+}
+
+/*
+ * Accessor to read the GIC Re-distributor IPRIORITYR corresponding to the
+ * interrupt `id`, 4 interrupts IDs at a time.
+ */
+unsigned int gicr_read_ipriorityr(uintptr_t base, unsigned int id)
+{
+	unsigned n = id >> IPRIORITYR_SHIFT;
+	return mmio_read_32(base + GICR_IPRIORITYR + (n << 2));
+}
+
+/*
+ * Accessor to write the GIC Re-distributor IPRIORITYR corresponding to the
+ * interrupt `id`, 4 interrupts IDs at a time.
+ */
+void gicr_write_ipriorityr(uintptr_t base, unsigned int id, unsigned int val)
+{
+	unsigned n = id >> IPRIORITYR_SHIFT;
+	mmio_write_32(base + GICR_IPRIORITYR + (n << 2), val);
+}
+
+/*
+ * Accessor to get the bit corresponding to interrupt ID
+ * from GIC Re-distributor IGROUPR0.
+ */
+unsigned int gicr_get_igroupr0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGROUPR_SHIFT) - 1);
+	unsigned int reg_val = gicr_read_igroupr0(base);
+
+	return (reg_val >> bit_num) & 0x1;
+}
+
+/*
+ * Accessor to set the bit corresponding to interrupt ID
+ * in GIC Re-distributor IGROUPR0.
+ */
+void gicr_set_igroupr0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGROUPR_SHIFT) - 1);
+	unsigned int reg_val = gicr_read_igroupr0(base);
+
+	gicr_write_igroupr0(base, reg_val | (1 << bit_num));
+}
+
+/*
+ * Accessor to clear the bit corresponding to interrupt ID
+ * in GIC Re-distributor IGROUPR0.
+ */
+void gicr_clr_igroupr0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGROUPR_SHIFT) - 1);
+	unsigned int reg_val = gicr_read_igroupr0(base);
+
+	gicr_write_igroupr0(base, reg_val & ~(1 << bit_num));
+}
+
+/*
+ * Accessor to get the bit corresponding to interrupt ID
+ * from GIC Re-distributor IGRPMODR0.
+ */
+unsigned int gicr_get_igrpmodr0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGRPMODR_SHIFT) - 1);
+	unsigned int reg_val = gicr_read_igrpmodr0(base);
+
+	return (reg_val >> bit_num) & 0x1;
+}
+
+/*
+ * Accessor to set the bit corresponding to interrupt ID
+ * in GIC Re-distributor IGRPMODR0.
+ */
+void gicr_set_igrpmodr0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGRPMODR_SHIFT) - 1);
+	unsigned int reg_val = gicr_read_igrpmodr0(base);
+
+	gicr_write_igrpmodr0(base, reg_val | (1 << bit_num));
+}
+
+/*
+ * Accessor to clear the bit corresponding to interrupt ID
+ * in GIC Re-distributor IGRPMODR0.
+ */
+void gicr_clr_igrpmodr0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << IGRPMODR_SHIFT) - 1);
+	unsigned int reg_val = gicr_read_igrpmodr0(base);
+
+	gicr_write_igrpmodr0(base, reg_val & ~(1 << bit_num));
+}
+
+/*
+ * Accessor to set the bit corresponding to interrupt ID
+ * in GIC Re-distributor ISENABLER0.
+ */
+void gicr_set_isenabler0(uintptr_t base, unsigned int id)
+{
+	unsigned bit_num = id & ((1 << ISENABLER_SHIFT) - 1);
+
+	gicr_write_isenabler0(base, (1 << bit_num));
+}
+
+/*
+ * Accessor to set the byte corresponding to interrupt ID
+ * in GIC Re-distributor IPRIORITYR.
+ */
+void gicr_set_ipriorityr(uintptr_t base, unsigned int id, unsigned int pri)
+{
+	mmio_write_8(base + GICR_IPRIORITYR + id, pri & GIC_PRI_MASK);
+}
 
 /******************************************************************************
  * This function marks the core as awake in the re-distributor and
@@ -25,15 +190,16 @@ void gicv3_rdistif_mark_core_awake(uintptr_t gicr_base)
 	 * The WAKER_PS_BIT should be changed to 0
 	 * only when WAKER_CA_BIT is 1.
 	 */
-	assert((gicr_read_waker(gicr_base) & WAKER_CA_BIT) != 0U);
+	assert(gicr_read_waker(gicr_base) & WAKER_CA_BIT);
 
 	/* Mark the connected core as awake */
 	gicr_write_waker(gicr_base, gicr_read_waker(gicr_base) & ~WAKER_PS_BIT);
 
 	/* Wait till the WAKER_CA_BIT changes to 0 */
-	while ((gicr_read_waker(gicr_base) & WAKER_CA_BIT) != 0U) {
-	}
+	while (gicr_read_waker(gicr_base) & WAKER_CA_BIT)
+		;
 }
+
 
 /******************************************************************************
  * This function marks the core as asleep in the re-distributor and ensures
@@ -45,9 +211,10 @@ void gicv3_rdistif_mark_core_asleep(uintptr_t gicr_base)
 	gicr_write_waker(gicr_base, gicr_read_waker(gicr_base) | WAKER_PS_BIT);
 
 	/* Wait till the WAKER_CA_BIT changes to 1 */
-	while ((gicr_read_waker(gicr_base) & WAKER_CA_BIT) == 0U) {
-	}
+	while (!(gicr_read_waker(gicr_base) & WAKER_CA_BIT))
+		;
 }
+
 
 /*******************************************************************************
  * This function probes the Redistributor frames when the driver is initialised
@@ -61,10 +228,10 @@ void gicv3_rdistif_base_addrs_probe(uintptr_t *rdistif_base_addrs,
 {
 	u_register_t mpidr;
 	unsigned int proc_num;
-	uint64_t typer_val;
+	unsigned long long typer_val;
 	uintptr_t rdistif_base = gicr_base;
 
-	assert(rdistif_base_addrs != NULL);
+	assert(rdistif_base_addrs);
 
 	/*
 	 * Iterate over the Redistributor frames. Store the base address of each
@@ -75,296 +242,160 @@ void gicv3_rdistif_base_addrs_probe(uintptr_t *rdistif_base_addrs,
 	 */
 	do {
 		typer_val = gicr_read_typer(rdistif_base);
-		if (mpidr_to_core_pos != NULL) {
+		if (mpidr_to_core_pos) {
 			mpidr = mpidr_from_gicr_typer(typer_val);
 			proc_num = mpidr_to_core_pos(mpidr);
 		} else {
 			proc_num = (typer_val >> TYPER_PROC_NUM_SHIFT) &
 				TYPER_PROC_NUM_MASK;
 		}
-
-		if (proc_num < rdistif_num) {
-			rdistif_base_addrs[proc_num] = rdistif_base;
-		}
-
-		rdistif_base += (1U << GICR_PCPUBASE_SHIFT);
-	} while ((typer_val & TYPER_LAST_BIT) == 0U);
+		assert(proc_num < rdistif_num);
+		rdistif_base_addrs[proc_num] = rdistif_base;
+		rdistif_base += (1 << GICR_PCPUBASE_SHIFT);
+	} while (!(typer_val & TYPER_LAST_BIT));
 }
 
 /*******************************************************************************
- * Helper function to configure the default attributes of (E)SPIs.
+ * Helper function to configure the default attributes of SPIs.
  ******************************************************************************/
-void gicv3_spis_config_defaults(uintptr_t gicd_base)
+void gicv3_spis_configure_defaults(uintptr_t gicd_base)
 {
-	unsigned int i, num_ints;
-#if GIC_EXT_INTID
-	unsigned int num_eints;
-#endif
-	unsigned int typer_reg = gicd_read_typer(gicd_base);
+	unsigned int index, num_ints;
 
-	/* Maximum SPI INTID is 32 * (GICD_TYPER.ITLinesNumber + 1) - 1 */
-	num_ints = ((typer_reg & TYPER_IT_LINES_NO_MASK) + 1U) << 5;
+	num_ints = gicd_read_typer(gicd_base);
+	num_ints &= TYPER_IT_LINES_NO_MASK;
+	num_ints = (num_ints + 1) << 5;
 
 	/*
-	 * The GICv3 architecture allows GICD_TYPER.ITLinesNumber to be 31, so
-	 * the maximum possible value for num_ints is 1024. Limit the value to
-	 * MAX_SPI_ID + 1 to avoid getting wrong address in GICD_OFFSET() macro.
+	 * Treat all SPIs as G1NS by default. The number of interrupts is
+	 * calculated as 32 * (IT_LINES + 1). We do 32 at a time.
 	 */
-	if (num_ints > MAX_SPI_ID + 1U) {
-		num_ints = MAX_SPI_ID + 1U;
-	}
-	INFO("Maximum SPI INTID supported: %u\n", num_ints - 1);
+	for (index = MIN_SPI_ID; index < num_ints; index += 32)
+		gicd_write_igroupr(gicd_base, index, ~0U);
 
-	/* Treat all (E)SPIs as G1NS by default. We do 32 at a time. */
-	for (i = MIN_SPI_ID; i < num_ints; i += (1U << IGROUPR_SHIFT)) {
-		gicd_write_igroupr(gicd_base, i, ~0U);
-	}
+	/* Setup the default SPI priorities doing four at a time */
+	for (index = MIN_SPI_ID; index < num_ints; index += 4)
+		gicd_write_ipriorityr(gicd_base,
+				      index,
+				      GICD_IPRIORITYR_DEF_VAL);
 
-#if GIC_EXT_INTID
-	/* Check if extended SPI range is implemented */
-	if ((typer_reg & TYPER_ESPI) != 0U) {
-		/*
-		 * Maximum ESPI INTID is 32 * (GICD_TYPER.ESPI_range + 1) + 4095
-		 */
-		num_eints = ((((typer_reg >> TYPER_ESPI_RANGE_SHIFT) &
-			TYPER_ESPI_RANGE_MASK) + 1U) << 5) + MIN_ESPI_ID;
-		INFO("Maximum ESPI INTID supported: %u\n", num_eints - 1);
-
-		for (i = MIN_ESPI_ID; i < num_eints;
-					i += (1U << IGROUPR_SHIFT)) {
-			gicd_write_igroupr(gicd_base, i, ~0U);
-		}
-	} else {
-		num_eints = 0U;
-		INFO("ESPI range is not implemented.\n");
-	}
-#endif
-
-	/* Setup the default (E)SPI priorities doing four at a time */
-	for (i = MIN_SPI_ID; i < num_ints; i += (1U << IPRIORITYR_SHIFT)) {
-		gicd_write_ipriorityr(gicd_base, i, GICD_IPRIORITYR_DEF_VAL);
-	}
-
-#if GIC_EXT_INTID
-	for (i = MIN_ESPI_ID; i < num_eints;
-					i += (1U << IPRIORITYR_SHIFT)) {
-		gicd_write_ipriorityr(gicd_base, i, GICD_IPRIORITYR_DEF_VAL);
-	}
-#endif
 	/*
-	 * Treat all (E)SPIs as level triggered by default, write 16 at a time
+	 * Treat all SPIs as level triggered by default, write 16 at
+	 * a time
 	 */
-	for (i = MIN_SPI_ID; i < num_ints; i += (1U << ICFGR_SHIFT)) {
-		gicd_write_icfgr(gicd_base, i, 0U);
-	}
-
-#if GIC_EXT_INTID
-	for (i = MIN_ESPI_ID; i < num_eints; i += (1U << ICFGR_SHIFT)) {
-		gicd_write_icfgr(gicd_base, i, 0U);
-	}
-#endif
+	for (index = MIN_SPI_ID; index < num_ints; index += 16)
+		gicd_write_icfgr(gicd_base, index, 0);
 }
 
 /*******************************************************************************
- * Helper function to configure properties of secure (E)SPIs
+ * Helper function to configure secure G0 and G1S SPIs.
  ******************************************************************************/
-unsigned int gicv3_secure_spis_config_props(uintptr_t gicd_base,
-		const interrupt_prop_t *interrupt_props,
-		unsigned int interrupt_props_num)
+void gicv3_secure_spis_configure(uintptr_t gicd_base,
+				     unsigned int num_ints,
+				     const unsigned int *sec_intr_list,
+				     unsigned int int_grp)
 {
-	unsigned int i;
-	const interrupt_prop_t *current_prop;
+	unsigned int index, irq_num;
 	unsigned long long gic_affinity_val;
-	unsigned int ctlr_enable = 0U;
 
-	/* Make sure there's a valid property array */
-	if (interrupt_props_num > 0U) {
-		assert(interrupt_props != NULL);
+	assert((int_grp == INTR_GROUP1S) || (int_grp == INTR_GROUP0));
+	/* If `num_ints` is not 0, ensure that `sec_intr_list` is not NULL */
+	assert(num_ints ? (uintptr_t)sec_intr_list : 1);
+
+	for (index = 0; index < num_ints; index++) {
+		irq_num = sec_intr_list[index];
+		if (irq_num >= MIN_SPI_ID) {
+
+			/* Configure this interrupt as a secure interrupt */
+			gicd_clr_igroupr(gicd_base, irq_num);
+
+			/* Configure this interrupt as G0 or a G1S interrupt */
+			if (int_grp == INTR_GROUP1S)
+				gicd_set_igrpmodr(gicd_base, irq_num);
+			else
+				gicd_clr_igrpmodr(gicd_base, irq_num);
+
+			/* Set the priority of this interrupt */
+			gicd_set_ipriorityr(gicd_base,
+					      irq_num,
+					      GIC_HIGHEST_SEC_PRIORITY);
+
+			/* Target SPIs to the primary CPU */
+			gic_affinity_val =
+				gicd_irouter_val_from_mpidr(read_mpidr(), 0);
+			gicd_write_irouter(gicd_base,
+					   irq_num,
+					   gic_affinity_val);
+
+			/* Enable this interrupt */
+			gicd_set_isenabler(gicd_base, irq_num);
+		}
 	}
 
-	for (i = 0U; i < interrupt_props_num; i++) {
-		current_prop = &interrupt_props[i];
-
-		unsigned int intr_num = current_prop->intr_num;
-
-		/* Skip SGI, (E)PPI and LPI interrupts */
-		if (!IS_SPI(intr_num)) {
-			continue;
-		}
-
-		/* Configure this interrupt as a secure interrupt */
-		gicd_clr_igroupr(gicd_base, intr_num);
-
-		/* Configure this interrupt as G0 or a G1S interrupt */
-		assert((current_prop->intr_grp == INTR_GROUP0) ||
-				(current_prop->intr_grp == INTR_GROUP1S));
-
-		if (current_prop->intr_grp == INTR_GROUP1S) {
-			gicd_set_igrpmodr(gicd_base, intr_num);
-			ctlr_enable |= CTLR_ENABLE_G1S_BIT;
-		} else {
-			gicd_clr_igrpmodr(gicd_base, intr_num);
-			ctlr_enable |= CTLR_ENABLE_G0_BIT;
-		}
-
-		/* Set interrupt configuration */
-		gicd_set_icfgr(gicd_base, intr_num, current_prop->intr_cfg);
-
-		/* Set the priority of this interrupt */
-		gicd_set_ipriorityr(gicd_base, intr_num,
-					current_prop->intr_pri);
-
-		/* Target (E)SPIs to the primary CPU */
-		gic_affinity_val =
-			gicd_irouter_val_from_mpidr(read_mpidr(), 0U);
-		gicd_write_irouter(gicd_base, intr_num,
-					gic_affinity_val);
-
-		/* Enable this interrupt */
-		gicd_set_isenabler(gicd_base, intr_num);
-	}
-
-	return ctlr_enable;
 }
 
 /*******************************************************************************
- * Helper function to configure the default attributes of (E)SPIs
+ * Helper function to configure the default attributes of SPIs.
  ******************************************************************************/
-void gicv3_ppi_sgi_config_defaults(uintptr_t gicr_base)
+void gicv3_ppi_sgi_configure_defaults(uintptr_t gicr_base)
 {
-	unsigned int i, ppi_regs_num, regs_num;
+	unsigned int index;
 
-#if GIC_EXT_INTID
-	/* Calculate number of PPI registers */
-	ppi_regs_num = (unsigned int)((gicr_read_typer(gicr_base) >>
-			TYPER_PPI_NUM_SHIFT) & TYPER_PPI_NUM_MASK) + 1;
-	/* All other values except PPInum [0-2] are reserved */
-	if (ppi_regs_num > 3U) {
-		ppi_regs_num = 1U;
-	}
-#else
-	ppi_regs_num = 1U;
-#endif
 	/*
-	 * Disable all SGIs (imp. def.)/(E)PPIs before configuring them.
-	 * This is a more scalable approach as it avoids clearing
-	 * the enable bits in the GICD_CTLR.
+	 * Disable all SGIs (imp. def.)/PPIs before configuring them. This is a
+	 * more scalable approach as it avoids clearing the enable bits in the
+	 * GICD_CTLR
 	 */
-	for (i = 0U; i < ppi_regs_num; ++i) {
-		gicr_write_icenabler(gicr_base, i, ~0U);
-	}
-
-	/* Wait for pending writes to GICR_ICENABLER */
+	gicr_write_icenabler0(gicr_base, ~0);
 	gicr_wait_for_pending_write(gicr_base);
 
-	/* 32 interrupt IDs per GICR_IGROUPR register */
-	for (i = 0U; i < ppi_regs_num; ++i) {
-		/* Treat all SGIs/(E)PPIs as G1NS by default */
-		gicr_write_igroupr(gicr_base, i, ~0U);
-	}
+	/* Treat all SGIs/PPIs as G1NS by default. */
+	gicr_write_igroupr0(gicr_base, ~0U);
 
-	/* 4 interrupt IDs per GICR_IPRIORITYR register */
-	regs_num = ppi_regs_num << 3;
-	for (i = 0U; i < regs_num; ++i) {
-		/* Setup the default (E)PPI/SGI priorities doing 4 at a time */
-		gicr_write_ipriorityr(gicr_base, i, GICD_IPRIORITYR_DEF_VAL);
-	}
+	/* Setup the default PPI/SGI priorities doing four at a time */
+	for (index = 0; index < MIN_SPI_ID; index += 4)
+		gicr_write_ipriorityr(gicr_base,
+				      index,
+				      GICD_IPRIORITYR_DEF_VAL);
 
-	/* 16 interrupt IDs per GICR_ICFGR register */
-	regs_num = ppi_regs_num << 1;
-	for (i = (MIN_PPI_ID >> ICFGR_SHIFT); i < regs_num; ++i) {
-		/* Configure all (E)PPIs as level triggered by default */
-		gicr_write_icfgr(gicr_base, i, 0U);
-	}
+	/* Configure all PPIs as level triggered by default */
+	gicr_write_icfgr1(gicr_base, 0);
 }
 
 /*******************************************************************************
- * Helper function to configure properties of secure G0 and G1S (E)PPIs and SGIs
+ * Helper function to configure secure G0 and G1S SPIs.
  ******************************************************************************/
-unsigned int gicv3_secure_ppi_sgi_config_props(uintptr_t gicr_base,
-		const interrupt_prop_t *interrupt_props,
-		unsigned int interrupt_props_num)
+void gicv3_secure_ppi_sgi_configure(uintptr_t gicr_base,
+					unsigned int num_ints,
+					const unsigned int *sec_intr_list,
+					unsigned int int_grp)
 {
-	unsigned int i;
-	const interrupt_prop_t *current_prop;
-	unsigned int ctlr_enable = 0U;
+	unsigned int index, irq_num;
 
-	/* Make sure there's a valid property array */
-	if (interrupt_props_num > 0U) {
-		assert(interrupt_props != NULL);
+	assert((int_grp == INTR_GROUP1S) || (int_grp == INTR_GROUP0));
+	/* If `num_ints` is not 0, ensure that `sec_intr_list` is not NULL */
+	assert(num_ints ? (uintptr_t)sec_intr_list : 1);
+
+	for (index = 0; index < num_ints; index++) {
+		irq_num = sec_intr_list[index];
+		if (irq_num < MIN_SPI_ID) {
+
+			/* Configure this interrupt as a secure interrupt */
+			gicr_clr_igroupr0(gicr_base, irq_num);
+
+			/* Configure this interrupt as G0 or a G1S interrupt */
+			if (int_grp == INTR_GROUP1S)
+				gicr_set_igrpmodr0(gicr_base, irq_num);
+			else
+				gicr_clr_igrpmodr0(gicr_base, irq_num);
+
+			/* Set the priority of this interrupt */
+			gicr_set_ipriorityr(gicr_base,
+					    irq_num,
+					    GIC_HIGHEST_SEC_PRIORITY);
+
+			/* Enable this interrupt */
+			gicr_set_isenabler0(gicr_base, irq_num);
+		}
 	}
-
-	for (i = 0U; i < interrupt_props_num; i++) {
-		current_prop = &interrupt_props[i];
-
-		unsigned int intr_num = current_prop->intr_num;
-
-		/* Skip (E)SPI interrupt */
-		if (!IS_SGI_PPI(intr_num)) {
-			continue;
-		}
-
-		/* Configure this interrupt as a secure interrupt */
-		gicr_clr_igroupr(gicr_base, intr_num);
-
-		/* Configure this interrupt as G0 or a G1S interrupt */
-		assert((current_prop->intr_grp == INTR_GROUP0) ||
-			(current_prop->intr_grp == INTR_GROUP1S));
-
-		if (current_prop->intr_grp == INTR_GROUP1S) {
-			gicr_set_igrpmodr(gicr_base, intr_num);
-			ctlr_enable |= CTLR_ENABLE_G1S_BIT;
-		} else {
-			gicr_clr_igrpmodr(gicr_base, intr_num);
-			ctlr_enable |= CTLR_ENABLE_G0_BIT;
-		}
-
-		/* Set the priority of this interrupt */
-		gicr_set_ipriorityr(gicr_base, intr_num,
-					current_prop->intr_pri);
-
-		/*
-		 * Set interrupt configuration for (E)PPIs.
-		 * Configurations for SGIs 0-15 are ignored.
-		 */
-		if (intr_num >= MIN_PPI_ID) {
-			gicr_set_icfgr(gicr_base, intr_num,
-					current_prop->intr_cfg);
-		}
-
-		/* Enable this interrupt */
-		gicr_set_isenabler(gicr_base, intr_num);
-	}
-
-	return ctlr_enable;
-}
-
-/**
- * gicv3_rdistif_get_number_frames() - determine size of GICv3 GICR region
- * @gicr_frame: base address of the GICR region to check
- *
- * This iterates over the GICR_TYPER registers of multiple GICR frames in
- * a GICR region, to find the instance which has the LAST bit set. For most
- * systems this corresponds to the number of cores handled by a redistributor,
- * but there could be disabled cores among them.
- * It assumes that each GICR region is fully accessible (till the LAST bit
- * marks the end of the region).
- * If a platform has multiple GICR regions, this function would need to be
- * called multiple times, providing the respective GICR base address each time.
- *
- * Return: number of valid GICR frames (at least 1, up to PLATFORM_CORE_COUNT)
- ******************************************************************************/
-unsigned int gicv3_rdistif_get_number_frames(const uintptr_t gicr_frame)
-{
-	uintptr_t rdistif_base = gicr_frame;
-	unsigned int count;
-
-	for (count = 1; count < PLATFORM_CORE_COUNT; count++) {
-		if ((gicr_read_typer(rdistif_base) & TYPER_LAST_BIT) != 0U) {
-			break;
-		}
-		rdistif_base += (1U << GICR_PCPUBASE_SHIFT);
-	}
-
-	return count;
 }

@@ -1,18 +1,15 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <asm_macros.S>
-#include <drivers/arm/gicv2.h>
+#include <gicv2.h>
 #include <platform_def.h>
 
 	.globl	plat_secondary_cold_boot_setup
 	.globl	plat_is_my_cpu_primary
-	.globl	zynqmp_calc_core_pos
-	.globl	plat_my_core_pos
-	.globl	platform_mem_init
 
 	/* -----------------------------------------------------
 	 * void plat_secondary_cold_boot_setup (void);
@@ -50,37 +47,3 @@ func plat_is_my_cpu_primary
 	cset	x0, eq
 	ret	x9
 endfunc plat_is_my_cpu_primary
-
-	/* -----------------------------------------------------
-	 *  unsigned int plat_my_core_pos(void)
-	 *  This function uses the zynqmp_calc_core_pos()
-	 *  definition to get the index of the calling CPU.
-	 * -----------------------------------------------------
-	 */
-func plat_my_core_pos
-	mrs	x0, mpidr_el1
-	b	zynqmp_calc_core_pos
-endfunc plat_my_core_pos
-
-	/* -----------------------------------------------------
-	 *  unsigned int zynqmp_calc_core_pos(u_register_t mpidr)
-	 *  Helper function to calculate the core position.
-	 *  With this function: CorePos = (ClusterId * 4) +
-	 *  				  CoreId
-	 * -----------------------------------------------------
-	 */
-func zynqmp_calc_core_pos
-	and	x1, x0, #MPIDR_CPU_MASK
-	and	x0, x0, #MPIDR_CLUSTER_MASK
-	add	x0, x1, x0, LSR #6
-	ret
-endfunc zynqmp_calc_core_pos
-
-	/* ---------------------------------------------------------------------
-	 * We don't need to carry out any memory initialization on ARM
-	 * platforms. The Secure RAM is accessible straight away.
-	 * ---------------------------------------------------------------------
-	 */
-func platform_mem_init
-	ret
-endfunc platform_mem_init

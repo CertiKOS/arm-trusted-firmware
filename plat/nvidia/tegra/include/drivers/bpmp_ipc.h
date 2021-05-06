@@ -1,16 +1,15 @@
 /*
  * Copyright (c) 2017-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef BPMP_IPC_H
-#define BPMP_IPC_H
+#ifndef __BPMP_IPC_H__
+#define __BPMP_IPC_H__
 
-#include <lib/utils_def.h>
 #include <stdbool.h>
-#include <stdint.h>
+#include <types.h>
+#include <utils_def.h>
 
 /**
  * Currently supported reset identifiers
@@ -40,4 +39,4 @@ int tegra_bpmp_ipc_enable_clock(uint32_t clk_id);
  */
 int tegra_bpmp_ipc_disable_clock(uint32_t clk_id);
 
-#endif /* BPMP_IPC_H */
+#endif /* __BPMP_IPC_H__ */

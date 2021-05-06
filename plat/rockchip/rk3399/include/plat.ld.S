@@ -3,10 +3,10 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef ROCKCHIP_PLAT_LD_S
-#define ROCKCHIP_PLAT_LD_S
+#ifndef __ROCKCHIP_PLAT_LD_S__
+#define __ROCKCHIP_PLAT_LD_S__
 
-#include <lib/xlat_tables/xlat_tables_defs.h>
+#include <xlat_tables_defs.h>
 
 MEMORY {
     SRAM (rwx): ORIGIN = SRAM_BASE, LENGTH = SRAM_SIZE
@@ -77,22 +77,15 @@ SECTIONS
 		ASSERT(. == ALIGN(64 * 1024),
 			".pmusram.entry request 64K aligned.");
 		*(.pmusram.entry)
-
 		__bl31_pmusram_text_start = .;
 		*(.pmusram.text)
 		*(.pmusram.rodata)
 		__bl31_pmusram_text_end = .;
-
-		/* M0 start address request 4K align */
-		. = ALIGN(4096);
-		__pmusram_incbin_start = .;
-		*(.pmusram.incbin)
-		__pmusram_incbin_end = .;
-
 		__bl31_pmusram_data_start = .;
 		*(.pmusram.data)
 		__bl31_pmusram_data_end = .;
+
 	} >PMUSRAM
 }
 
-#endif /* ROCKCHIP_PLAT_LD_S */
+#endif /* __ROCKCHIP_PLAT_LD_S__ */

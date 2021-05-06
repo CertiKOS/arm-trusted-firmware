@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -149,15 +149,16 @@ getc_error:
 endfunc console_core_getc
 
 	/* ---------------------------------------------
-	 * void console_core_flush(uintptr_t base_addr)
+	 * int console_core_flush(uintptr_t base_addr)
 	 * Function to force a write of all buffered
 	 * data that hasn't been output.
 	 * In : x0 - console base address
-	 * Out : void.
+	 * Out : return -1 on error else return 0.
 	 * Clobber list : x0, x1
 	 * ---------------------------------------------
 	 */
 func console_core_flush
 	/* Placeholder */
+	mov	w0, #0
 	ret
 endfunc console_core_flush

@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef FIPTOOL_H
-#define FIPTOOL_H
+#ifndef __FIPTOOL_H__
+#define __FIPTOOL_H__
 
 #include <stddef.h>
 #include <stdint.h>
 
 #include <firmware_image_package.h>
 #include <uuid.h>
-
-#include "fiptool_platform.h"
 
 #define NELEM(x) (sizeof (x) / sizeof *(x))
 
@@ -48,7 +46,7 @@ typedef struct image {
 typedef struct cmd {
 	char              *name;
 	int              (*handler)(int, char **);
-	void             (*usage)(int);
+	void             (*usage)(void);
 } cmd_t;
 
-#endif /* FIPTOOL_H */
+#endif /* __FIPTOOL_H__ */

@@ -1,15 +1,13 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 /* Top level SMC handler for SiP calls. Dispatch PM calls to PM SMC handler. */
 
-#include <common/runtime_svc.h>
-#include <tools_share/uuid.h>
-
-#include "ipi_mailbox_svc.h"
+#include <runtime_svc.h>
+#include <uuid.h>
 #include "pm_svc_main.h"
 
 /* SMC function IDs for SiP Service queries */
@@ -21,20 +19,15 @@
 #define SIP_SVC_VERSION_MAJOR	0
 #define SIP_SVC_VERSION_MINOR	1
 
-/* These macros are used to identify PM, IPI calls from the SMC function ID */
+/* These macros are used to identify PM calls from the SMC function ID */
 #define PM_FID_MASK	0xf000u
 #define PM_FID_VALUE	0u
-#define IPI_FID_VALUE	0x1000u
-#define EM_FID_MASK     0xf0000u
-#define EM_FID_VALUE    0xE0000u
-#define is_em_fid(_fid) (((_fid) & EM_FID_MASK) == EM_FID_VALUE)
 #define is_pm_fid(_fid) (((_fid) & PM_FID_MASK) == PM_FID_VALUE)
-#define is_ipi_fid(_fid) (((_fid) & PM_FID_MASK) == IPI_FID_VALUE)
 
 /* SiP Service UUID */
-DEFINE_SVC_UUID2(zynqmp_sip_uuid,
-	0x5c9b1b2a, 0x0586, 0x2340, 0xa6, 0x1b,
-	0xb9, 0x25, 0x82, 0x2d, 0xe3, 0xa5);
+DEFINE_SVC_UUID(zynqmp_sip_uuid,
+		0x2a1d9b5c, 0x8605, 0x4023, 0xa6, 0x1b,
+		0xb9, 0x25, 0x82, 0x2d, 0xe3, 0xa5);
 
 /**
  * sip_svc_setup() - Setup SiP Service
@@ -44,7 +37,9 @@ DEFINE_SVC_UUID2(zynqmp_sip_uuid,
 static int32_t sip_svc_setup(void)
 {
 	/* PM implementation as SiP Service */
-	return pm_setup();
+	pm_setup();
+
+	return 0;
 }
 
 /**
@@ -53,28 +48,18 @@ static int32_t sip_svc_setup(void)
  * Handler for all SiP SMC calls. Handles standard SIP requests
  * and calls PM SMC handler if the call is for a PM-API function.
  */
-uintptr_t sip_svc_smc_handler(uint32_t smc_fid,
-			      u_register_t x1,
-			      u_register_t x2,
-			      u_register_t x3,
-			      u_register_t x4,
-			      void *cookie,
-			      void *handle,
-			      u_register_t flags)
+uint64_t sip_svc_smc_handler(uint32_t smc_fid,
+			     uint64_t x1,
+			     uint64_t x2,
+			     uint64_t x3,
+			     uint64_t x4,
+			     void *cookie,
+			     void *handle,
+			     uint64_t flags)
 {
-	/* Let EM SMC handler deal with EM-related requests */
-	if (is_em_fid(smc_fid)) {
-		return em_smc_handler(smc_fid, x1, x2, x3, x4, cookie, handle,
-					flags);
-	} else if (is_pm_fid(smc_fid)) {
 	/* Let PM SMC handler deal with PM-related requests */
+	if (is_pm_fid(smc_fid)) {
 		return pm_smc_handler(smc_fid, x1, x2, x3, x4, cookie, handle,
-				      flags);
-	}
-
-	/* Let IPI SMC handler deal with IPI-related requests */
-	if (is_ipi_fid(smc_fid)) {
-		return ipi_smc_handler(smc_fid, x1, x2, x3, x4, cookie, handle,
 				      flags);
 	}
 

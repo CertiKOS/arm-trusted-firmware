@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2014-2016, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2017, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef STD_SVC_H
-#define STD_SVC_H
+#ifndef __STD_SVC_H__
+#define __STD_SVC_H__
 
 /* SMC function IDs for Standard Service queries */
 
@@ -25,6 +25,15 @@
  * mask identifying the range of SMC function IDs available
  * to the service.
  */
-uintptr_t get_arm_std_svc_args(unsigned int svc_mask);
+uintptr_t get_arm_std_svc_args(uint32_t svc_mask);
 
-#endif /* STD_SVC_H */
+uintptr_t std_svc_smc_handler(uint32_t smc_fid,
+			     u_register_t x1,
+			     u_register_t x2,
+			     u_register_t x3,
+			     u_register_t x4,
+			     void *cookie,
+			     void *handle,
+			     u_register_t flags);
+
+#endif /* __STD_SVC_H__ */

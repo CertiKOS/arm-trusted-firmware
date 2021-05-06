@@ -1,13 +1,11 @@
 /*
- * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef PLATFORM_DEF_H
-#define PLATFORM_DEF_H
-
-#include <lib/utils_def.h>
+#ifndef __PLATFORM_DEF_H__
+#define __PLATFORM_DEF_H__
 
 #define PLAT_PRIMARY_CPU  0x0
 
@@ -117,6 +115,10 @@
 
 #define FIQ_SMP_CALL_SGI  MT_IRQ_SEC_SGI_5
 
+#define PLAT_ARM_G0_IRQS	FIQ_SMP_CALL_SGI
+
+#define DEBUG_XLAT_TABLE 0
+
 /*******************************************************************************
  * Platform binary types for linking
  ******************************************************************************/
@@ -128,7 +130,9 @@
  ******************************************************************************/
 
 /* Size of cacheable stacks */
-#if defined(IMAGE_BL1)
+#if DEBUG_XLAT_TABLE
+#define PLATFORM_STACK_SIZE 0x800
+#elif defined(IMAGE_BL1)
 #define PLATFORM_STACK_SIZE 0x440
 #elif defined(IMAGE_BL2)
 #define PLATFORM_STACK_SIZE 0x400
@@ -139,19 +143,20 @@
 #endif
 
 #define FIRMWARE_WELCOME_STR    "Booting Trusted Firmware\n"
-#define PLAT_MAX_PWR_LVL        U(2) /* MPIDR_AFFLVL2 */
-
-#define PLAT_MAX_RET_STATE	U(1)
-#define PLAT_MAX_OFF_STATE	U(2)
+#if ENABLE_PLAT_COMPAT
+#define PLATFORM_MAX_AFFLVL     MPIDR_AFFLVL2
+#else
+#define PLAT_MAX_PWR_LVL        2 /* MPIDR_AFFLVL2 */
+#endif
 
 #define PLATFORM_CACHE_LINE_SIZE      64
-#define PLATFORM_SYSTEM_COUNT         U(1)
-#define PLATFORM_CLUSTER_COUNT        U(2)
-#define PLATFORM_CLUSTER0_CORE_COUNT  U(4)
-#define PLATFORM_CLUSTER1_CORE_COUNT  U(4)
+#define PLATFORM_SYSTEM_COUNT         1
+#define PLATFORM_CLUSTER_COUNT        2
+#define PLATFORM_CLUSTER0_CORE_COUNT  4
+#define PLATFORM_CLUSTER1_CORE_COUNT  4
 #define PLATFORM_CORE_COUNT   (PLATFORM_CLUSTER1_CORE_COUNT + \
 					PLATFORM_CLUSTER0_CORE_COUNT)
-#define PLATFORM_MAX_CPUS_PER_CLUSTER U(4)
+#define PLATFORM_MAX_CPUS_PER_CLUSTER 4
 #define PLATFORM_NUM_AFFS   (PLATFORM_SYSTEM_COUNT +  \
 					PLATFORM_CLUSTER_COUNT + \
 					PLATFORM_CORE_COUNT)
@@ -191,8 +196,7 @@
 /*******************************************************************************
  * Platform specific page table and MMU setup constants
  ******************************************************************************/
-#define PLAT_VIRT_ADDR_SPACE_SIZE   (1ULL << 32)
-#define PLAT_PHY_ADDR_SPACE_SIZE    (1ULL << 32)
+#define ADDR_SPACE_SIZE   (1ull << 32)
 #define MAX_XLAT_TABLES   7
 #define MAX_MMAP_REGIONS  16
 
@@ -235,4 +239,4 @@
 #define PAGE_SIZE_2MB               (1 << PAGE_SIZE_2MB_SHIFT)
 #define PAGE_SIZE_2MB_SHIFT         TWO_MB_SHIFT
 
-#endif /* PLATFORM_DEF_H */
+#endif /* __PLATFORM_DEF_H__ */

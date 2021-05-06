@@ -1,13 +1,14 @@
 /*
- * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <bl_common.h>
+#include <desc_image_load.h>
+#include <platform.h>
 #include <platform_def.h>
 
-#include <common/bl_common.h>
-#include <common/desc_image_load.h>
 
 /*******************************************************************************
  * Following descriptor provides BL image/ep information that gets used
@@ -53,15 +54,7 @@ static bl_mem_params_node_t bl2_mem_params_descs[] = {
 
 	    .next_handoff_image_id = BL33_IMAGE_ID,
     },
-	/* Fill HW_CONFIG related information if it exists */
-    {
-	    .image_id = HW_CONFIG_ID,
-	    SET_STATIC_PARAM_HEAD(ep_info, PARAM_IMAGE_BINARY,
-		    VERSION_2, entry_point_info_t, NON_SECURE | NON_EXECUTABLE),
-	    SET_STATIC_PARAM_HEAD(image_info, PARAM_IMAGE_BINARY,
-		    VERSION_2, image_info_t, IMAGE_ATTRIB_SKIP_LOADING),
-	    .next_handoff_image_id = INVALID_IMAGE_ID,
-    },
+
 	/* Fill BL33 related information */
     {
 	    .image_id = BL33_IMAGE_ID,
@@ -74,13 +67,12 @@ static bl_mem_params_node_t bl2_mem_params_descs[] = {
 	    SET_STATIC_PARAM_HEAD(image_info, PARAM_EP,
 		    VERSION_2, image_info_t, IMAGE_ATTRIB_SKIP_LOADING),
 #else
-	    .ep_info.pc = PLAT_ARM_NS_IMAGE_BASE,
+	    .ep_info.pc = PLAT_ARM_NS_IMAGE_OFFSET,
 
 	    SET_STATIC_PARAM_HEAD(image_info, PARAM_EP,
 		    VERSION_2, image_info_t, 0),
-	    .image_info.image_base = PLAT_ARM_NS_IMAGE_BASE,
-	    .image_info.image_max_size = ARM_DRAM1_BASE + ARM_DRAM1_SIZE
-		    - PLAT_ARM_NS_IMAGE_BASE,
+	    .image_info.image_base = PLAT_ARM_NS_IMAGE_OFFSET,
+	    .image_info.image_max_size = ARM_DRAM1_SIZE,
 #endif /* PRELOADED_BL33_BASE */
 
 	    .next_handoff_image_id = INVALID_IMAGE_ID,

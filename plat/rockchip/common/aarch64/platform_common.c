@@ -4,18 +4,16 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <string.h>
-
-#include <platform_def.h>
-
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <drivers/arm/cci.h>
-#include <lib/utils.h>
-#include <lib/xlat_tables/xlat_tables.h>
-
+#include <arm_gic.h>
+#include <bl_common.h>
+#include <cci.h>
+#include <debug.h>
+#include <string.h>
+#include <xlat_tables.h>
+#include <platform_def.h>
 #include <plat_private.h>
+#include <utils.h>
 
 #ifdef PLAT_RK_CCI_BASE
 static const int cci_map[] = {

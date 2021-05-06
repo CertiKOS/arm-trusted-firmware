@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifndef SPM_H
-#define SPM_H
+#ifndef __SPM_H__
+#define __SPM_H__
 
 #define SPM_POWERON_CONFIG_SET			(SPM_BASE + 0x000)
 #define SPM_POWER_ON_VAL0			(SPM_BASE + 0x010)
@@ -320,6 +320,7 @@ void spm_register_init(void);
 void spm_go_to_hotplug(void);
 void spm_init_event_vector(const struct pcm_desc *pcmdesc);
 void spm_kick_im_to_fetch(const struct pcm_desc *pcmdesc);
+void spm_set_sysclk_settle(void);
 int is_mcdi_ready(void);
 int is_hotplug_ready(void);
 int is_suspend_ready(void);
@@ -332,4 +333,4 @@ void spm_lock_get(void);
 void spm_lock_release(void);
 void spm_boot_init(void);
 
-#endif /* SPM_H */
+#endif /* __SPM_H__ */

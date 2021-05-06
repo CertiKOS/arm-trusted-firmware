@@ -5,7 +5,7 @@
  */
 
 #include <asm_macros.S>
-#include <lib/el3_runtime/cpu_data.h>
+#include <cpu_data.h>
 
 	.globl	_cpu_data
 	.globl	_cpu_data_by_index
@@ -34,9 +34,7 @@ endfunc _cpu_data
  * -----------------------------------------------------------------
  */
 func _cpu_data_by_index
-	mov_imm	r1, CPU_DATA_SIZE
-	mul	r0, r0, r1
 	ldr	r1, =percpu_data
-	add	r0, r0, r1
+	add	r0, r1, r0, LSL #CPU_DATA_LOG2SIZE
 	bx	lr
 endfunc _cpu_data_by_index

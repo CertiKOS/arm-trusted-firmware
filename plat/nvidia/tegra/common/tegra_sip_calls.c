@@ -1,22 +1,18 @@
 /*
- * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <assert.h>
-#include <errno.h>
-
 #include <arch.h>
 #include <arch_helpers.h>
-#include <common/bl_common.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/mmio.h>
-
+#include <assert.h>
+#include <bl_common.h>
+#include <debug.h>
+#include <errno.h>
 #include <memctrl.h>
-#include <tegra_platform.h>
+#include <mmio.h>
+#include <runtime_svc.h>
 #include <tegra_private.h>
 
 /*******************************************************************************
@@ -29,14 +25,14 @@
 /*******************************************************************************
  * This function is responsible for handling all SiP calls
  ******************************************************************************/
-uintptr_t tegra_sip_handler(uint32_t smc_fid,
-			    u_register_t x1,
-			    u_register_t x2,
-			    u_register_t x3,
-			    u_register_t x4,
-			    void *cookie,
-			    void *handle,
-			    u_register_t flags)
+uint64_t tegra_sip_handler(uint32_t smc_fid,
+			   uint64_t x1,
+			   uint64_t x2,
+			   uint64_t x3,
+			   uint64_t x4,
+			   void *cookie,
+			   void *handle,
+			   uint64_t flags)
 {
 	uint32_t regval, local_x2_32 = (uint32_t)x2;
 	int32_t err;
@@ -52,12 +48,6 @@ uintptr_t tegra_sip_handler(uint32_t smc_fid,
 		switch (smc_fid) {
 
 		case TEGRA_SIP_NEW_VIDEOMEM_REGION:
-			/* Check whether Video memory resize is enabled */
-			if (mmio_read_32(TEGRA_MC_BASE + MC_VIDEO_PROTECT_REG_CTRL)
-				!= MC_VIDEO_PROTECT_WRITE_ACCESS_ENABLED) {
-				ERROR("Video Memory Resize isn't enabled! \n");
-				SMC_RET1(handle, (uint64_t)-ENOTSUP);
-			}
 
 			/*
 			 * Check if Video Memory overlaps TZDRAM (contains bl31/bl32)
@@ -101,7 +91,9 @@ uintptr_t tegra_sip_handler(uint32_t smc_fid,
 									GPU_SET_BIT);
 			}
 
-			SMC_RET1(handle, 0);
+			/* return success */
+			write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (0));
+			break;
 
 		/*
 		 * The NS world registers the address of its handler to be
@@ -112,7 +104,7 @@ uintptr_t tegra_sip_handler(uint32_t smc_fid,
 		case TEGRA_SIP_FIQ_NS_ENTRYPOINT:
 
 			if (x1 == 0U) {
-				SMC_RET1(handle, SMC_UNK);
+				SMC_RET1(handle, 0xFFFFFFFFU); /* SMC_UNK */
 			}
 
 			/*
@@ -122,7 +114,9 @@ uintptr_t tegra_sip_handler(uint32_t smc_fid,
 			/* store the NS world's entrypoint */
 			tegra_fiq_set_ns_entrypoint(x1);
 
-			SMC_RET1(handle, 0);
+			/* return success */
+			write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (0));
+			break;
 
 		/*
 		 * The NS world's FIQ handler issues this SMC to get the NS EL1/EL0
@@ -135,15 +129,16 @@ uintptr_t tegra_sip_handler(uint32_t smc_fid,
 			/* retrieve context registers when FIQ triggered */
 			(void)tegra_fiq_get_intr_context();
 
-			SMC_RET0(handle);
+			break;
 
 		default:
 			ERROR("%s: unhandled SMC (0x%x)\n", __func__, smc_fid);
+			write_ctx_reg((get_gpregs_ctx(handle)), (CTX_GPREG_X0), (uint64_t)SMC_UNK);
 			break;
 		}
 	}
 
-	SMC_RET1(handle, SMC_UNK);
+	return 0;
 }
 
 /* Define a runtime service descriptor for fast SMC calls */
@@ -152,7 +147,7 @@ DECLARE_RT_SVC(
 
 	(OEN_SIP_START),
 	(OEN_SIP_END),
-	(SMC_TYPE_FAST),
+	(uint8_t)(SMC_TYPE_FAST),
 	(NULL),
 	(tegra_sip_handler)
 );

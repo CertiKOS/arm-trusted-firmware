@@ -3,12 +3,10 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
 #include <assert.h>
-
-#include <common/debug.h>
-#include <lib/pmf/pmf.h>
-#include <plat/common/platform.h>
+#include <debug.h>
+#include <platform.h>
+#include <pmf.h>
 #include <smccc_helpers.h>
 
 /*
@@ -32,29 +30,35 @@ uintptr_t pmf_smc_handler(unsigned int smc_fid,
 		x2 = (uint32_t)x2;
 		x3 = (uint32_t)x3;
 
-		if (smc_fid == PMF_SMC_GET_TIMESTAMP_32) {
+		switch (smc_fid) {
+		case PMF_SMC_GET_TIMESTAMP_32:
 			/*
 			 * Return error code and the captured
 			 * time-stamp to the caller.
 			 * x0 --> error code.
 			 * x1 - x2 --> time-stamp value.
 			 */
-			rc = pmf_get_timestamp_smc((unsigned int)x1, x2,
-					(unsigned int)x3, &ts_value);
+			rc = pmf_get_timestamp_smc(x1, x2, x3, &ts_value);
 			SMC_RET3(handle, rc, (uint32_t)ts_value,
 					(uint32_t)(ts_value >> 32));
+
+		default:
+			break;
 		}
 	} else {
-		if (smc_fid == PMF_SMC_GET_TIMESTAMP_64) {
+		switch (smc_fid) {
+		case PMF_SMC_GET_TIMESTAMP_64:
 			/*
 			 * Return error code and the captured
 			 * time-stamp to the caller.
 			 * x0 --> error code.
 			 * x1 --> time-stamp value.
 			 */
-			rc = pmf_get_timestamp_smc((unsigned int)x1, x2,
-					(unsigned int)x3, &ts_value);
+			rc = pmf_get_timestamp_smc(x1, x2, x3, &ts_value);
 			SMC_RET2(handle, rc, ts_value);
+
+		default:
+			break;
 		}
 	}
 

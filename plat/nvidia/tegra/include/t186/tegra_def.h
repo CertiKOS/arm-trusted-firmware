@@ -1,19 +1,13 @@
 /*
  * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
- * Copyright (c) 2020, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef TEGRA_DEF_H
-#define TEGRA_DEF_H
+#ifndef __TEGRA_DEF_H__
+#define __TEGRA_DEF_H__
 
-#include <lib/utils_def.h>
-
-/*******************************************************************************
- * Platform BL31 specific defines.
- ******************************************************************************/
-#define BL31_SIZE			U(0x40000)
+#include <utils_def.h>
 
 /*******************************************************************************
  * MCE apertures used by the ARI interface
@@ -168,8 +162,6 @@
 #define MC_VIDEO_PROTECT_BASE_HI	U(0x978)
 #define MC_VIDEO_PROTECT_BASE_LO	U(0x648)
 #define MC_VIDEO_PROTECT_SIZE_MB	U(0x64C)
-#define MC_VIDEO_PROTECT_REG_CTRL	U(0x650)
-#define MC_VIDEO_PROTECT_WRITE_ACCESS_ENABLED	U(3)
 
 /*
  * Carveout (MC_SECURITY_CARVEOUT24) registers used to clear the
@@ -208,6 +200,12 @@
 #define TEGRA_FUSE_BASE			U(0x03820000)
 #define  OPT_SUBREVISION		U(0x248)
 #define  SUBREVISION_MASK		U(0xFF)
+
+/*******************************************************************************
+ * Clock identifier for the FUSE device
+ ******************************************************************************/
+#define TEGRA186_CLK_FUSE               U(0)
+#define TEGRA_CLK_FUSE                  TEGRA186_CLK_FUSE
 
 /*******************************************************************************
  * GICv2 & interrupt handling related constants
@@ -282,8 +280,8 @@
 #define SCRATCH_RESET_VECTOR_LO		SECURE_SCRATCH_RSV1_LO
 #define SCRATCH_RESET_VECTOR_HI		SECURE_SCRATCH_RSV1_HI
 #define SCRATCH_SECURE_BOOTP_FCFG	SECURE_SCRATCH_RSV6
-#define SCRATCH_MC_TABLE_ADDR_LO	SECURE_SCRATCH_RSV11_LO
-#define SCRATCH_MC_TABLE_ADDR_HI	SECURE_SCRATCH_RSV11_HI
+#define SCRATCH_SMMU_TABLE_ADDR_LO	SECURE_SCRATCH_RSV11_LO
+#define SCRATCH_SMMU_TABLE_ADDR_HI	SECURE_SCRATCH_RSV11_HI
 #define SCRATCH_BL31_PARAMS_ADDR	SECURE_SCRATCH_RSV53_LO
 #define SCRATCH_BL31_PLAT_PARAMS_ADDR	SECURE_SCRATCH_RSV53_HI
 #define SCRATCH_TZDRAM_ADDR_LO		SECURE_SCRATCH_RSV55_LO
@@ -312,16 +310,16 @@
 #define TEGRA_TZRAM_SIZE		U(0x40000)
 
 /*******************************************************************************
+ * Tegra DRAM memory base address
+ ******************************************************************************/
+#define TEGRA_DRAM_BASE			ULL(0x80000000)
+#define TEGRA_DRAM_END			ULL(0x27FFFFFFF)
+
+/*******************************************************************************
  * Tegra CCPLEX-BPMP IPC constants
  ******************************************************************************/
 #define TEGRA_BPMP_IPC_TX_PHYS_BASE	U(0x3004C000)
 #define TEGRA_BPMP_IPC_RX_PHYS_BASE	U(0x3004D000)
 #define TEGRA_BPMP_IPC_CH_MAP_SIZE	U(0x1000) /* 4KB */
 
-/*******************************************************************************
- * Tegra DRAM memory base address
- ******************************************************************************/
-#define TEGRA_DRAM_BASE			ULL(0x80000000)
-#define TEGRA_DRAM_END			ULL(0x27FFFFFFF)
-
-#endif /* TEGRA_DEF_H */
+#endif /* __TEGRA_DEF_H__ */
