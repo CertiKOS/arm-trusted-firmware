@@ -136,24 +136,19 @@
  *
  * Put BL2 just below BL3-1. BL2_BASE is calculated using the current BL2 debug
  * size plus a little space for growth.
- *
- * RTH: calculate this as if it was below where BL31 would be.
  */
-#define BL2_BASE			(BL_RAM_BASE + BL_RAM_SIZE - 0x45000)
-#define BL2_LIMIT			BL1_RW_BASE
+#define BL2_BASE           (BL31_BASE - 0x25000)
+#define BL2_LIMIT          BL31_BASE
 
 /*
  * BL3-1 specific defines.
  *
  * Put BL3-1 at the top of the Trusted SRAM. BL31_BASE is calculated using the
  * current BL3-1 debug size plus a little space for growth.
- *
- * RTH: For certikos we change this to be Trusted DRAM
  */
-#define BL31_BASE			(SEC_DRAM_BASE)
-#define BL31_LIMIT			(SEC_DRAM_BASE + SEC_DRAM_SIZE)
-#define BL31_PROGBITS_LIMIT		(SEC_DRAM_BASE + SEC_DRAM_SIZE)
-
+#define BL31_BASE          (BL31_LIMIT - 0x20000)
+#define BL31_LIMIT         (BL_RAM_BASE + BL_RAM_SIZE)
+#define BL31_PROGBITS_LIMIT        BL1_RW_BASE
 
 /*
  * BL3-2 specific defines.
