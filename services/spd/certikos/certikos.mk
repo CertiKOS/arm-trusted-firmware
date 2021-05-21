@@ -6,7 +6,8 @@
 
 SPD_INCLUDES		:=
 
-SPD_SOURCES		:=	services/spd/certikos/certikos.c
+SPD_SOURCES		:=	services/spd/certikos/certikos.c \
+					services/spd/certikos/helpers.S
 
 #ifeq (${TRUSTY_SPD_WITH_GENERIC_SERVICES},1)
 #SPD_SOURCES		+=	services/spd/trusty/generic-arm64-smcall.c
