@@ -153,6 +153,8 @@ certikos_el3_smc_handler(
         switch(smc_fid) {
             case SMC_FC_FIQ_EXIT:
             case SMC_FC64_FIQ_EXIT:
+                cm_el1_sysregs_context_save(SECURE);
+
                 ns_ctx = cm_get_context(NON_SECURE);
                 cm_el1_sysregs_context_restore(NON_SECURE);
                 cm_set_next_eret_context(NON_SECURE);
@@ -163,6 +165,9 @@ certikos_el3_smc_handler(
                 ctx = get_cpu_ctx();
                 ctx->el1_fiq_handler = x1;
                 ctx->el1_smc_handler = x2;
+
+                cm_el1_sysregs_context_save(SECURE);
+
                 certikos_el3_world_switch_enter(ctx->saved_sp);
 
                 NOTICE("BACK HERE?\n");
