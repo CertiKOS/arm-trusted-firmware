@@ -297,6 +297,7 @@ void plat_relocate_bl32_image(const image_info_t *bl32_img_info)
 	const entry_point_info_t *bl32_ep_info = bl31_plat_get_next_image_ep_info(SECURE);
 	uint64_t tzdram_start, tzdram_end, bl32_start, bl32_end;
 
+
 	if ((bl32_img_info != NULL) && (bl32_ep_info != NULL)) {
 
 		/* Relocate BL32 if it resides outside of the TZDRAM */
@@ -306,15 +307,20 @@ void plat_relocate_bl32_image(const image_info_t *bl32_img_info)
 		bl32_start = bl32_img_info->image_base;
 		bl32_end = bl32_img_info->image_base + bl32_img_info->image_size;
 
+        ((entry_point_info_t*)bl32_ep_info)->pc = tzdram_start + 0x100000;
+
 		assert(tzdram_end > tzdram_start);
 		assert(bl32_end > bl32_start);
-		assert(bl32_ep_info->pc > tzdram_start);
+		assert(bl32_ep_info->pc >= tzdram_start);
 		assert(bl32_ep_info->pc < tzdram_end);
+
+        NOTICE("TZDRAM: %p - %p, BL32: %p - %p\n", (void*)tzdram_start, (void*)tzdram_end, (void*)bl32_start, (void*)bl32_end);
 
 		/* relocate BL32 */
 		if ((bl32_start >= tzdram_end) || (bl32_end <= tzdram_start)) {
 
-			INFO("Relocate BL32 to TZDRAM\n");
+			NOTICE("Relocate BL32 to TZDRAM\n");
+            NOTICE("Relocated to %p\n", (void*)bl32_ep_info->pc);
 
 			tegra_memcpy(bl32_ep_info->pc, bl32_start,
 				    (uint64_t)bl32_img_info->image_size);

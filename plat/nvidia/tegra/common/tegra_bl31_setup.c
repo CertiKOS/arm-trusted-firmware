@@ -111,6 +111,10 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 		bl32_image_ep_info = *from_bl2->bl32_ep_info;
 	}
 
+
+    plat_params->tzdram_size = 0x10000000; /* RTH: 256MB */
+    plat_params->tzdram_base = 0x260000000;
+
 	/*
 	 * Parse platform specific parameters
 	 */

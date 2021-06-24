@@ -56,7 +56,7 @@ get_cpu_ctx(void)
 static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 {
-    //NOTICE("BL3-1: Certikos FIQ\n");
+    NOTICE("BL3-1: Certikos FIQ\n");
 
     /* Switch to secure world */
     //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
@@ -101,6 +101,25 @@ certikos_el3_boot_certikos(void)
     cm_el1_sysregs_context_restore(SECURE);
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(SECURE);
+
+    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_SIF_BIT), 0);
+    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_EA_BIT), 1);
+    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
+    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
+
+    NOTICE("certikos SCR = %lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
+    NOTICE("certikos_ep->pc = %p\n", (void*)certikos_ep->pc);
+    //for(int i = 0; i < 8; ++i) {
+    //    NOTICE("%x %x %x %x %x %x %x %x\n",
+    //        *(((char*)certikos_ep->pc)+i*8+0),
+    //        *(((char*)certikos_ep->pc)+i*8+1),
+    //        *(((char*)certikos_ep->pc)+i*8+2),
+    //        *(((char*)certikos_ep->pc)+i*8+3),
+    //        *(((char*)certikos_ep->pc)+i*8+4),
+    //        *(((char*)certikos_ep->pc)+i*8+5),
+    //        *(((char*)certikos_ep->pc)+i*8+6),
+    //        *(((char*)certikos_ep->pc)+i*8+7));
+    //}
 
     certikos_el3_world_switch_return(&ctx->saved_sp);
 
@@ -149,6 +168,8 @@ certikos_el3_smc_handler(
     certikos_el3_cpu_ctx * ctx;
 
     (void)(ns_ctx);
+
+    NOTICE("CERTIKOS SMC\n");
 
 
     if(is_caller_secure(flags)) {
