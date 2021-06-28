@@ -108,7 +108,7 @@ certikos_el3_boot_certikos(void)
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
 
     NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
-    NOTICE("BL31: CertiKOS PC=0x%p\n", (void*)certikos_ep->pc);
+    NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
 
     certikos_el3_world_switch_return(&ctx->saved_sp);
 

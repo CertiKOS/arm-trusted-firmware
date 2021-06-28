@@ -206,7 +206,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
         (boot_params_addr < TEGRA_DRAM_BASE ?
             boot_params_addr << 16 : boot_params_addr);
 
-    NOTICE("BL31: Global Boot Params: 0x%p\n", boot_params);
+    NOTICE("BL31: Global Boot Params: %p\n", boot_params);
     NOTICE("BL31: Updating TZDRAM carveout params.\n");
 
     boot_params->carveout[CARVEOUT_TZDRAM].base = plat_params->tzdram_base;
