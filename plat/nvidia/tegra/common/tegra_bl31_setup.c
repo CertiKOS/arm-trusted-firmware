@@ -25,6 +25,7 @@
 #include <tegra_def.h>
 #include <tegra_platform.h>
 #include <tegra_private.h>
+#include <tegrabl_global_data.h>
 
 static entry_point_info_t bl33_image_ep_info, bl32_image_ep_info;
 static plat_params_from_bl2_t plat_bl31_params_from_bl2 = {
@@ -115,6 +116,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
     plat_params->tzdram_size = 0x10000000; /* RTH: 256MB */
     plat_params->tzdram_base = 0x260000000;
 
+
 	/*
 	 * Parse platform specific parameters
 	 */
@@ -197,6 +199,20 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	 */
 	plat_relocate_bl32_image(from_bl2->bl32_image_info);
 #endif
+
+    uintptr_t boot_params_addr = mmio_read_32(
+        TEGRA_SCRATCH_BASE + SCRATCH_BL33_BOOT_PARAMS);
+    struct tegrabl_global_data * boot_params = (struct tegrabl_global_data *)
+        (boot_params_addr < TEGRA_DRAM_BASE ?
+            boot_params_addr << 16 : boot_params_addr);
+
+    NOTICE("BL31: Global Boot Params: 0x%p\n", boot_params);
+    NOTICE("BL31: Updating TZDRAM carveout params.\n");
+
+    boot_params->carveout[CARVEOUT_TZDRAM].base = plat_params->tzdram_base;
+    boot_params->carveout[CARVEOUT_TZDRAM].size = plat_params->tzdram_size;
+
+
 
 	/*
 	 * Add timestamp for platform early setup exit.

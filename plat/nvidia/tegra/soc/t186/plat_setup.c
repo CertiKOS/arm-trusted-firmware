@@ -314,8 +314,6 @@ void plat_relocate_bl32_image(const image_info_t *bl32_img_info)
 		assert(bl32_ep_info->pc >= tzdram_start);
 		assert(bl32_ep_info->pc < tzdram_end);
 
-        NOTICE("TZDRAM: %p - %p, BL32: %p - %p\n", (void*)tzdram_start, (void*)tzdram_end, (void*)bl32_start, (void*)bl32_end);
-
 		/* relocate BL32 */
 		if ((bl32_start >= tzdram_end) || (bl32_end <= tzdram_start)) {
 

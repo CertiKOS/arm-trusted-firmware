@@ -147,7 +147,6 @@ void tegra_memctrl_tzdram_setup(uint64_t phys_base, uint32_t size_in_bytes)
 	/*
 	 * Perform platform specific steps.
 	 */
-    NOTICE("TZDRAM SETUP: %lu %u\n", phys_base, size_in_bytes);
 	plat_memctrl_tzdram_setup(phys_base, size_in_bytes);
 }
 

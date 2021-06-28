@@ -81,7 +81,7 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 static int32_t
 certikos_el3_boot_certikos(void)
 {
-    NOTICE("BL3-1: Booting CertiKOS\n");
+    NOTICE("BL31: Booting CertiKOS\n");
 
     entry_point_info_t* certikos_ep = bl31_plat_get_next_image_ep_info(SECURE);
     assert(certikos_ep != NULL);
@@ -107,24 +107,13 @@ certikos_el3_boot_certikos(void)
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
 
-    NOTICE("certikos SCR = %lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
-    NOTICE("certikos_ep->pc = %p\n", (void*)certikos_ep->pc);
-    //for(int i = 0; i < 8; ++i) {
-    //    NOTICE("%x %x %x %x %x %x %x %x\n",
-    //        *(((char*)certikos_ep->pc)+i*8+0),
-    //        *(((char*)certikos_ep->pc)+i*8+1),
-    //        *(((char*)certikos_ep->pc)+i*8+2),
-    //        *(((char*)certikos_ep->pc)+i*8+3),
-    //        *(((char*)certikos_ep->pc)+i*8+4),
-    //        *(((char*)certikos_ep->pc)+i*8+5),
-    //        *(((char*)certikos_ep->pc)+i*8+6),
-    //        *(((char*)certikos_ep->pc)+i*8+7));
-    //}
+    NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
+    NOTICE("BL31: CertiKOS PC=0x%p\n", (void*)certikos_ep->pc);
 
     certikos_el3_world_switch_return(&ctx->saved_sp);
 
 
-    NOTICE("BL3-1: Booting Normal World\n");
+    NOTICE("BL31: Booting Normal World\n");
     entry_point_info_t* ns_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
     assert(ns_ep != NULL);
 
@@ -139,7 +128,7 @@ certikos_el3_boot_certikos(void)
 static int32_t
 certikos_el3_setup(void)
 {
-    NOTICE("BL3-1: Starting CertiKOS Service\n");
+    NOTICE("BL31: Starting CertiKOS Service\n");
 
     /* Tell the framework to route Secure World FIQs to EL3 during NS execution */
     uint32_t flags = 0;
@@ -169,7 +158,7 @@ certikos_el3_smc_handler(
 
     (void)(ns_ctx);
 
-    NOTICE("CERTIKOS SMC\n");
+    NOTICE("BL31: CertiKOS SMC\n");
 
 
     if(is_caller_secure(flags)) {
