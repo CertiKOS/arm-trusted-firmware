@@ -56,8 +56,6 @@ get_cpu_ctx(void)
 static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 {
-    NOTICE("BL3-1: Certikos FIQ\n");
-
     /* Switch to secure world */
     //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
     cm_el1_sysregs_context_save(NON_SECURE);
@@ -72,8 +70,6 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
     cm_el1_sysregs_context_restore(SECURE);
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(SECURE);
-
-
 
     SMC_RET0(&ctx->cpu_ctx);
 }
@@ -107,6 +103,10 @@ certikos_el3_boot_certikos(void)
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
 
+    //cm_write_scr_el3_bit(NON_SECURE, __builtin_ctz(SCR_EA_BIT), 1);
+    //cm_write_scr_el3_bit(NON_SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
+    //cm_write_scr_el3_bit(NON_SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
+
     NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
     NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
 
@@ -117,9 +117,12 @@ certikos_el3_boot_certikos(void)
     entry_point_info_t* ns_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
     assert(ns_ep != NULL);
 
+    //NOTICE("BL31: Cboot PC=%p\n", (void*)ns_ep->pc);
+
     cm_el1_sysregs_context_restore(NON_SECURE);
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(NON_SECURE);
+
 
     return 1;
 }
@@ -157,8 +160,6 @@ certikos_el3_smc_handler(
     certikos_el3_cpu_ctx * ctx;
 
     (void)(ns_ctx);
-
-    NOTICE("BL31: CertiKOS SMC\n");
 
 
     if(is_caller_secure(flags)) {
