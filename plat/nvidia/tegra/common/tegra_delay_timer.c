@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
+#include <debug.h>
 #include <delay_timer.h>
 #include <mmio.h>
 #include <platform.h>
@@ -17,7 +17,9 @@
 /* Enable physical secure timer */
 #define CNTPS_CTL_EL1_ENABLE_TIMER	(U(1) << 0)
 #define CNTPS_CTL_EL1_DISABLE_INTERRUPT	(U(1) << 1)
-#define ENABLE_CNTPS_EL1_TIMER		(CNTPS_CTL_EL1_DISABLE_INTERRUPT | \
+//#define ENABLE_CNTPS_EL1_TIMER		(CNTPS_CTL_EL1_DISABLE_INTERRUPT |
+//					 CNTPS_CTL_EL1_ENABLE_TIMER)
+#define ENABLE_CNTPS_EL1_TIMER		(\
 					 CNTPS_CTL_EL1_ENABLE_TIMER)
 
 static uint32_t tegra_timer_get_value(void)

@@ -27,6 +27,9 @@
 #include <tegra_private.h>
 #include <tegrabl_global_data.h>
 
+#include <memctrl_v2.h>
+#include <armc.h>
+
 static entry_point_info_t bl33_image_ep_info, bl32_image_ep_info;
 static plat_params_from_bl2_t plat_bl31_params_from_bl2 = {
 	.tzdram_size = TZDRAM_SIZE
@@ -211,6 +214,162 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 
     boot_params->carveout[CARVEOUT_TZDRAM].base = plat_params->tzdram_base;
     boot_params->carveout[CARVEOUT_TZDRAM].size = plat_params->tzdram_size;
+
+
+
+    const uintptr_t carveout_bom_lo_regs[] =
+    {
+        MC_SECURITY_CARVEOUT1_BOM_0,
+        MC_SECURITY_CARVEOUT2_BOM_0,
+        MC_SECURITY_CARVEOUT3_BOM_0,
+        MC_SECURITY_CARVEOUT4_BOM_0,
+        MC_SECURITY_CARVEOUT5_BOM_0,
+        MC_SECURITY_CARVEOUT6_BOM_0,
+        MC_SECURITY_CARVEOUT7_BOM_0,
+        MC_SECURITY_CARVEOUT8_BOM_0,
+        MC_SECURITY_CARVEOUT9_BOM_0,
+        MC_SECURITY_CARVEOUT10_BOM_0,
+        MC_SECURITY_CARVEOUT11_BOM_0,
+        MC_SECURITY_CARVEOUT12_BOM_0,
+        MC_SECURITY_CARVEOUT13_BOM_0,
+        MC_SECURITY_CARVEOUT14_BOM_0,
+        MC_SECURITY_CARVEOUT15_BOM_0,
+        MC_SECURITY_CARVEOUT16_BOM_0,
+        MC_SECURITY_CARVEOUT17_BOM_0,
+        MC_SECURITY_CARVEOUT18_BOM_0,
+        MC_SECURITY_CARVEOUT19_BOM_0,
+        MC_SECURITY_CARVEOUT20_BOM_0,
+        MC_SECURITY_CARVEOUT21_BOM_0,
+        MC_SECURITY_CARVEOUT22_BOM_0,
+        MC_SECURITY_CARVEOUT23_BOM_0,
+        MC_SECURITY_CARVEOUT24_BOM_0,
+        MC_SECURITY_CARVEOUT25_BOM_0,
+        MC_SECURITY_CARVEOUT26_BOM_0,
+        MC_SECURITY_CARVEOUT27_BOM_0,
+        MC_SECURITY_CARVEOUT28_BOM_0,
+        MC_SECURITY_CARVEOUT29_BOM_0,
+    };
+    const uintptr_t carveout_bom_hi_regs[] =
+    {
+        MC_SECURITY_CARVEOUT1_BOM_HI_0,
+        MC_SECURITY_CARVEOUT2_BOM_HI_0,
+        MC_SECURITY_CARVEOUT3_BOM_HI_0,
+        MC_SECURITY_CARVEOUT4_BOM_HI_0,
+        MC_SECURITY_CARVEOUT5_BOM_HI_0,
+        MC_SECURITY_CARVEOUT6_BOM_HI_0,
+        MC_SECURITY_CARVEOUT7_BOM_HI_0,
+        MC_SECURITY_CARVEOUT8_BOM_HI_0,
+        MC_SECURITY_CARVEOUT9_BOM_HI_0,
+        MC_SECURITY_CARVEOUT10_BOM_HI_0,
+        MC_SECURITY_CARVEOUT11_BOM_HI_0,
+        MC_SECURITY_CARVEOUT12_BOM_HI_0,
+        MC_SECURITY_CARVEOUT13_BOM_HI_0,
+        MC_SECURITY_CARVEOUT14_BOM_HI_0,
+        MC_SECURITY_CARVEOUT15_BOM_HI_0,
+        MC_SECURITY_CARVEOUT16_BOM_HI_0,
+        MC_SECURITY_CARVEOUT17_BOM_HI_0,
+        MC_SECURITY_CARVEOUT18_BOM_HI_0,
+        MC_SECURITY_CARVEOUT19_BOM_HI_0,
+        MC_SECURITY_CARVEOUT20_BOM_HI_0,
+        MC_SECURITY_CARVEOUT21_BOM_HI_0,
+        MC_SECURITY_CARVEOUT22_BOM_HI_0,
+        MC_SECURITY_CARVEOUT23_BOM_HI_0,
+        MC_SECURITY_CARVEOUT24_BOM_HI_0,
+        MC_SECURITY_CARVEOUT25_BOM_HI_0,
+        MC_SECURITY_CARVEOUT26_BOM_HI_0,
+        MC_SECURITY_CARVEOUT27_BOM_HI_0,
+        MC_SECURITY_CARVEOUT28_BOM_HI_0,
+        MC_SECURITY_CARVEOUT29_BOM_HI_0,
+    };
+    const uintptr_t carveout_size_regs[] =
+    {
+        MC_SECURITY_CARVEOUT1_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT2_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT3_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT4_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT5_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT6_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT7_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT8_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT9_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT10_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT11_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT12_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT13_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT14_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT15_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT16_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT17_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT18_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT19_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT20_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT21_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT22_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT23_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT24_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT25_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT26_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT27_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT28_SIZE_128KB_0,
+        MC_SECURITY_CARVEOUT29_SIZE_128KB_0,
+    };
+    const uintptr_t carveout_cfg_regs[] =
+    {
+        MC_SECURITY_CARVEOUT1_CFG0_0,
+        MC_SECURITY_CARVEOUT2_CFG0_0,
+        MC_SECURITY_CARVEOUT3_CFG0_0,
+        MC_SECURITY_CARVEOUT4_CFG0_0,
+        MC_SECURITY_CARVEOUT5_CFG0_0,
+        MC_SECURITY_CARVEOUT6_CFG0_0,
+        MC_SECURITY_CARVEOUT7_CFG0_0,
+        MC_SECURITY_CARVEOUT8_CFG0_0,
+        MC_SECURITY_CARVEOUT9_CFG0_0,
+        MC_SECURITY_CARVEOUT10_CFG0_0,
+        MC_SECURITY_CARVEOUT11_CFG0_0,
+        MC_SECURITY_CARVEOUT12_CFG0_0,
+        MC_SECURITY_CARVEOUT13_CFG0_0,
+        MC_SECURITY_CARVEOUT14_CFG0_0,
+        MC_SECURITY_CARVEOUT15_CFG0_0,
+        MC_SECURITY_CARVEOUT16_CFG0_0,
+        MC_SECURITY_CARVEOUT17_CFG0_0,
+        MC_SECURITY_CARVEOUT18_CFG0_0,
+        MC_SECURITY_CARVEOUT19_CFG0_0,
+        MC_SECURITY_CARVEOUT20_CFG0_0,
+        MC_SECURITY_CARVEOUT21_CFG0_0,
+        MC_SECURITY_CARVEOUT22_CFG0_0,
+        MC_SECURITY_CARVEOUT23_CFG0_0,
+        MC_SECURITY_CARVEOUT24_CFG0_0,
+        MC_SECURITY_CARVEOUT25_CFG0_0,
+        MC_SECURITY_CARVEOUT26_CFG0_0,
+        MC_SECURITY_CARVEOUT27_CFG0_0,
+        MC_SECURITY_CARVEOUT28_CFG0_0,
+        MC_SECURITY_CARVEOUT29_CFG0_0,
+    };
+
+    /* protect UARTC from normal world */
+    boot_params->carveout[CARVEOUT_NV_RSVD1].base = TEGRA_UARTC_BASE;
+    boot_params->carveout[CARVEOUT_NV_RSVD1].size = 0x1000;
+
+
+    /* assumes that UARTC is < 4GB address */
+    tegra_mc_write_32(carveout_bom_lo_regs[CARVEOUT_NV_RSVD1 - 1], TEGRA_UARTC_BASE);
+    tegra_mc_write_32(carveout_bom_lo_regs[CARVEOUT_OEM_RSVD1 - 1], TEGRA_UARTC_BASE);
+    tegra_mc_write_32(carveout_bom_lo_regs[CARVEOUT_OEM_RSVD2 - 1], TEGRA_UARTC_BASE);
+    tegra_mc_write_32(carveout_bom_lo_regs[CARVEOUT_OEM_RSVD3 - 1], TEGRA_UARTC_BASE);
+
+    tegra_mc_write_32(carveout_size_regs[CARVEOUT_NV_RSVD1 - 1], (1 << MC_GSC_SIZE_RANGE_4KB_SHIFT));
+
+    NOTICE("BL31: Reading Generalized Carveout Registers\n");
+    for(size_t i = 0; i < sizeof(carveout_bom_lo_regs)/sizeof(carveout_bom_lo_regs[0]); i++) {
+
+        uintptr_t lo = tegra_mc_read_32(carveout_bom_lo_regs[i]);
+        uintptr_t hi = tegra_mc_read_32(carveout_bom_hi_regs[i]);
+        uint32_t sz = tegra_mc_read_32(carveout_size_regs[i]);
+        uint32_t cf = tegra_mc_read_32(carveout_cfg_regs[i]);
+
+        NOTICE("\t%lu: %p (%x) (%x)\n", i, (void*)((hi << 32) | lo), sz, cf);
+    }
+
 
 
 

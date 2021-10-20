@@ -38,6 +38,7 @@ typedef struct {
 	uint32_t	        saved_security_state;
     uintptr_t           el1_fiq_handler;
     uintptr_t           el1_smc_handler;
+    uintptr_t           el1_start_ap;
 	gp_regs_t	        fiq_gpregs;
 	//certikos_el3_stack  secure_stack;
 } certikos_el3_cpu_ctx;
@@ -66,6 +67,8 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
     cm_set_elr_el3(SECURE, ctx->el1_fiq_handler);
 
     write_ctx_reg(get_sysregs_ctx(ctx), CTX_ESR_EL1, read_ctx_reg(el3_state, CTX_ESR_EL1));
+    //NOTICE("BL31: SCR=0x%lx\n", read_ctx_reg(el3_state, CTX_SCR_EL3));
+    //NOTICE("BL31: FIQ %x\n", flags);
 
     cm_el1_sysregs_context_restore(SECURE);
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
@@ -98,6 +101,12 @@ certikos_el3_boot_certikos(void)
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(SECURE);
 
+
+    if(plat_my_core_pos() != 0)
+    {
+        certikos_ep->pc = ctx->el1_start_ap;
+    }
+
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_SIF_BIT), 0);
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_EA_BIT), 1);
     //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
@@ -129,9 +138,50 @@ certikos_el3_boot_certikos(void)
 
 
 static int32_t
+certikos_el3_cpu_off(uint64_t v)
+{
+    NOTICE("certikos el3 cpu off %u\n", plat_my_core_pos());
+    return 0;
+}
+
+static void
+certikos_el3_cpu_on_finish(uint64_t v)
+{
+    NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
+
+    certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
+    if(ctx->saved_sp == NULL)
+    {
+        certikos_el3_boot_certikos();
+    }
+}
+
+static void
+certikos_el3_cpu_suspend(uint64_t max_off_lvl)
+{
+    NOTICE("certikos el3 cpu suspend %u\n", plat_my_core_pos());
+}
+
+static void
+certikos_el3_cpu_suspend_finish(uint64_t max_off_lvl)
+{
+    NOTICE("certikos el3 cpu suspend finish %u\n", plat_my_core_pos());
+}
+
+
+
+static int32_t
 certikos_el3_setup(void)
 {
     NOTICE("BL31: Starting CertiKOS Service\n");
+
+    static const spd_pm_ops_t certikos_pm = {
+        .svc_off = certikos_el3_cpu_off,
+        .svc_suspend = certikos_el3_cpu_suspend,
+        .svc_on_finish = certikos_el3_cpu_on_finish,
+        .svc_suspend_finish = certikos_el3_cpu_suspend_finish,
+    };
+    psci_register_spd_pm_hook(&certikos_pm);
 
     /* Tell the framework to route Secure World FIQs to EL3 during NS execution */
     uint32_t flags = 0;
@@ -162,6 +212,7 @@ certikos_el3_smc_handler(
     (void)(ns_ctx);
 
 
+
     if(is_caller_secure(flags)) {
         switch(smc_fid) {
             case SMC_FC_FIQ_EXIT:
@@ -178,6 +229,7 @@ certikos_el3_smc_handler(
                 ctx = get_cpu_ctx();
                 ctx->el1_fiq_handler = x1;
                 ctx->el1_smc_handler = x2;
+                ctx->el1_start_ap = x3;
 
                 cm_el1_sysregs_context_save(SECURE);
 
@@ -191,6 +243,7 @@ certikos_el3_smc_handler(
                 SMC_RET1(handle, SMC_UNK);
         }
     } else {
+        NOTICE("BL31: SMC fid:%x, x1:%lx, x2:%lx, x3:%lx, x4:%lx\n", smc_fid, x1, x2, x3, x4);
         switch(smc_fid) {
             default:
                 NOTICE("Unknown SMC (id=0x%x)\n", smc_fid);
@@ -199,6 +252,7 @@ certikos_el3_smc_handler(
         }
     }
 }
+
 
 
 /* Define a SPD runtime service descriptor for fast SMC calls */

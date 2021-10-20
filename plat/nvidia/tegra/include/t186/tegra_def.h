@@ -69,6 +69,19 @@
 #define TEGRA186_S_EL1_TIMER_IRQ    U(29)
 #define TEGRA186_TOP_WDT_IRQ		U(49)
 #define TEGRA186_AON_WDT_IRQ		U(50)
+#define TEGRA186_UART_A_IRQ         U(144)
+#define TEGRA186_UART_B_IRQ         U(145)
+#define TEGRA186_UART_C_IRQ         U(146)
+#define TEGRA186_UART_D_IRQ         U(147)
+#define TEGRA186_UART_E_IRQ         U(148)
+#define TEGRA186_UART_F_IRQ         U(149)
+#define TEGRA186_UART_G_IRQ         U(150)
+#define TEGRA186_SPI_1_IRQ          U(68)
+#define TEGRA186_SPI_2_IRQ          U(69)
+#define TEGRA186_SPI_3_IRQ          U(70)
+#define TEGRA186_SPI_4_IRQ          U(71)
+#define TEGRA186_GPC_DMA_CH30_IRQ   U(137)
+#define TEGRA186_GPC_DMA_CH31_IRQ   U(138)
 
 #define TEGRA186_SEC_IRQ_TARGET_MASK	U(0xF3) /* 4 A57 - 2 Denver */
 
