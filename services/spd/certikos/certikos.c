@@ -33,16 +33,17 @@ typedef struct {
 
 
 typedef struct {
-	cpu_context_t	    cpu_ctx;
-	void		        *saved_sp;
-	uint32_t	        saved_security_state;
-    uintptr_t           el1_fiq_handler;
-    uintptr_t           el1_smc_handler;
-    uintptr_t           el1_start_ap;
-	gp_regs_t	        fiq_gpregs;
+	cpu_context_t	        cpu_ctx;
+	void		            *saved_sp;
+    uintptr_t               el1_fiq_handler;
+    uintptr_t               el1_smc_handler;
+    uintptr_t               el1_start_ap;
+	gp_regs_t	            fiq_gpregs;
 	//certikos_el3_stack  secure_stack;
 } certikos_el3_cpu_ctx;
 
+
+uintptr_t start_ap_global;
 
 static certikos_el3_cpu_ctx cpu_ctx[PLATFORM_CORE_COUNT];
 
@@ -80,10 +81,11 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 static int32_t
 certikos_el3_boot_certikos(void)
 {
-    NOTICE("BL31: Booting CertiKOS\n");
 
-    entry_point_info_t* certikos_ep = bl31_plat_get_next_image_ep_info(SECURE);
-    assert(certikos_ep != NULL);
+    entry_point_info_t * certikos_ep = bl31_plat_get_next_image_ep_info(SECURE);
+    certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
+
+    NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
 
     certikos_ep->spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
     memset(&certikos_ep->args, 0, sizeof(certikos_ep->args));
@@ -93,28 +95,12 @@ certikos_el3_boot_certikos(void)
     //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
     cm_el1_sysregs_context_save(NON_SECURE);
 
-    certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     cm_set_context(&ctx->cpu_ctx, SECURE);
     cm_init_my_context(certikos_ep);
 
     cm_el1_sysregs_context_restore(SECURE);
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(SECURE);
-
-
-    if(plat_my_core_pos() != 0)
-    {
-        certikos_ep->pc = ctx->el1_start_ap;
-    }
-
-    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_SIF_BIT), 0);
-    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_EA_BIT), 1);
-    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
-    //cm_write_scr_el3_bit(SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
-
-    //cm_write_scr_el3_bit(NON_SECURE, __builtin_ctz(SCR_EA_BIT), 1);
-    //cm_write_scr_el3_bit(NON_SECURE, __builtin_ctz(SCR_FIQ_BIT), 1);
-    //cm_write_scr_el3_bit(NON_SECURE, __builtin_ctz(SCR_IRQ_BIT), 1);
 
     NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
     NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
@@ -123,10 +109,6 @@ certikos_el3_boot_certikos(void)
 
 
     NOTICE("BL31: Booting Normal World\n");
-    entry_point_info_t* ns_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
-    assert(ns_ep != NULL);
-
-    //NOTICE("BL31: Cboot PC=%p\n", (void*)ns_ep->pc);
 
     cm_el1_sysregs_context_restore(NON_SECURE);
     //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
@@ -147,12 +129,39 @@ certikos_el3_cpu_off(uint64_t v)
 static void
 certikos_el3_cpu_on_finish(uint64_t v)
 {
-    NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
+    NOTICE("BL31: CPU on, core %u\n", plat_my_core_pos());
 
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     if(ctx->saved_sp == NULL)
     {
-        certikos_el3_boot_certikos();
+        NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
+        entry_point_info_t core_ep;
+
+        core_ep.pc = start_ap_global;
+        core_ep.spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
+        memset(&core_ep.args, 0, sizeof(core_ep.args));
+        SET_PARAM_HEAD(&core_ep, PARAM_EP, VERSION_1, SECURE | EP_ST_ENABLE |
+            ((read_sctlr_el3() & SCTLR_EE_BIT) ? EP_EE_BIG : 0));
+
+        //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
+
+        cm_set_context(&ctx->cpu_ctx, SECURE);
+        cm_init_my_context(&core_ep);
+
+        cm_el1_sysregs_context_restore(SECURE);
+        //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+        cm_set_next_eret_context(SECURE);
+
+        NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
+        NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
+
+
+        certikos_el3_world_switch_return(&ctx->saved_sp);
+        NOTICE("BL31: Booting Normal World\n");
+
+        cm_el1_sysregs_context_restore(NON_SECURE);
+        //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+        cm_set_next_eret_context(NON_SECURE);
     }
 }
 
@@ -229,7 +238,7 @@ certikos_el3_smc_handler(
                 ctx = get_cpu_ctx();
                 ctx->el1_fiq_handler = x1;
                 ctx->el1_smc_handler = x2;
-                ctx->el1_start_ap = x3;
+                start_ap_global = x3;
 
                 cm_el1_sysregs_context_save(SECURE);
 

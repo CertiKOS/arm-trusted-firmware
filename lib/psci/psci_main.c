@@ -366,6 +366,9 @@ u_register_t psci_smc_handler(uint32_t smc_fid,
 			  void *handle,
 			  u_register_t flags)
 {
+
+    NOTICE("PSCI Call (%x).\n", smc_fid);
+
 	uint32_t local_x1, local_x2, local_x3;
 	u_register_t ret = (u_register_t)PSCI_E_NOT_SUPPORTED;
 
@@ -467,7 +470,7 @@ u_register_t psci_smc_handler(uint32_t smc_fid,
 			break;
 
 		case PSCI_AFFINITY_INFO_AARCH64:
-			ret = (u_register_t)psci_affinity_info(x1, (uint32_t)x2);
+            ret = (u_register_t)psci_affinity_info(x1, (uint32_t)x2);
 			break;
 
 		case PSCI_MIG_AARCH64:
