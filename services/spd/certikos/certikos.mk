@@ -15,4 +15,5 @@ SPD_SOURCES		:=	services/spd/certikos/certikos.c \
 
 NEED_BL32		:=	yes
 
-#CTX_INCLUDE_FPREGS	:=	1
+CTX_INCLUDE_FPREGS	:=	1
+CTX_INCLUDE_AARCH32_REGS := 0

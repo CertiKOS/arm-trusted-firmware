@@ -58,21 +58,20 @@ get_cpu_ctx(void)
 static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 {
+
     /* Switch to secure world */
-    //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
+    fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
     cm_el1_sysregs_context_save(NON_SECURE);
 
-    el3_state_t *el3_state = get_el3state_ctx(handle);
 
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     cm_set_elr_el3(SECURE, ctx->el1_fiq_handler);
 
-    write_ctx_reg(get_sysregs_ctx(ctx), CTX_ESR_EL1, read_ctx_reg(el3_state, CTX_ESR_EL1));
-    //NOTICE("BL31: SCR=0x%lx\n", read_ctx_reg(el3_state, CTX_SCR_EL3));
-    //NOTICE("BL31: FIQ %x\n", flags);
+    //el3_state_t *el3_state = get_el3state_ctx(handle);
+    //write_ctx_reg(get_sysregs_ctx(ctx), CTX_ESR_EL1, read_ctx_reg(el3_state, CTX_ESR_EL1));
 
     cm_el1_sysregs_context_restore(SECURE);
-    //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+    fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(SECURE);
 
     SMC_RET0(&ctx->cpu_ctx);
@@ -92,14 +91,14 @@ certikos_el3_boot_certikos(void)
 
     EP_SET_ST(certikos_ep->h.attr, EP_ST_ENABLE);
 
-    //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
+    fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
     cm_el1_sysregs_context_save(NON_SECURE);
 
     cm_set_context(&ctx->cpu_ctx, SECURE);
     cm_init_my_context(certikos_ep);
 
     cm_el1_sysregs_context_restore(SECURE);
-    //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+    fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(SECURE);
 
     NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
@@ -111,7 +110,7 @@ certikos_el3_boot_certikos(void)
     NOTICE("BL31: Booting Normal World\n");
 
     cm_el1_sysregs_context_restore(NON_SECURE);
-    //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+    fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
     cm_set_next_eret_context(NON_SECURE);
 
 
@@ -143,13 +142,13 @@ certikos_el3_cpu_on_finish(uint64_t v)
         SET_PARAM_HEAD(&core_ep, PARAM_EP, VERSION_1, SECURE | EP_ST_ENABLE |
             ((read_sctlr_el3() & SCTLR_EE_BIT) ? EP_EE_BIG : 0));
 
-        //fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
+        fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
 
         cm_set_context(&ctx->cpu_ctx, SECURE);
         cm_init_my_context(&core_ep);
 
         cm_el1_sysregs_context_restore(SECURE);
-        //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+        fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
         cm_set_next_eret_context(SECURE);
 
         NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
@@ -157,11 +156,11 @@ certikos_el3_cpu_on_finish(uint64_t v)
 
 
         certikos_el3_world_switch_return(&ctx->saved_sp);
-        NOTICE("BL31: Booting Normal World\n");
+        NOTICE("BL31: Finished booting CertiKOS on core %u\n", plat_my_core_pos());
 
-        cm_el1_sysregs_context_restore(NON_SECURE);
+        //cm_el1_sysregs_context_restore(NON_SECURE);
         //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
-        cm_set_next_eret_context(NON_SECURE);
+        //cm_set_next_eret_context(NON_SECURE);
     }
 }
 
@@ -227,9 +226,11 @@ certikos_el3_smc_handler(
             case SMC_FC_FIQ_EXIT:
             case SMC_FC64_FIQ_EXIT:
                 cm_el1_sysregs_context_save(SECURE);
+                fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
 
                 ns_ctx = cm_get_context(NON_SECURE);
                 cm_el1_sysregs_context_restore(NON_SECURE);
+                fpregs_context_restore(get_fpregs_ctx(cm_get_context(NON_SECURE)));
                 cm_set_next_eret_context(NON_SECURE);
 
                 SMC_RET0(ns_ctx);
@@ -241,6 +242,7 @@ certikos_el3_smc_handler(
                 start_ap_global = x3;
 
                 cm_el1_sysregs_context_save(SECURE);
+                fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
 
                 certikos_el3_world_switch_enter(ctx->saved_sp);
 
