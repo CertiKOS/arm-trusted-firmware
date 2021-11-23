@@ -26,6 +26,10 @@
 #include "certikos_private.h"
 
 
+/* Set this to zero to disable */
+#define MULTICORE_ENABLE        (0)
+
+
 typedef struct {
 	uint8_t space[PLATFORM_STACK_SIZE] __aligned(16);
 	uint32_t end;
@@ -133,6 +137,8 @@ certikos_el3_cpu_on_finish(uint64_t v)
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     if(ctx->saved_sp == NULL)
     {
+        assert(MULTICORE_ENABLE && "Multicore Disabled");
+
         NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
         entry_point_info_t core_ep;
 
