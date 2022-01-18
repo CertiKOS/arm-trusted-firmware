@@ -66,6 +66,8 @@
 /*******************************************************************************
  * Secure IRQ definitions
  ******************************************************************************/
+#define TEGRA186_SEC_SGI0_IRQ       U(0)
+#define TEGRA186_SEC_SGI1_IRQ       U(1)
 #define TEGRA186_S_EL1_TIMER_IRQ    U(29)
 #define TEGRA186_TOP_WDT_IRQ		U(49)
 #define TEGRA186_AON_WDT_IRQ		U(50)

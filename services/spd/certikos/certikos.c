@@ -67,12 +67,19 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
     fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
     cm_el1_sysregs_context_save(NON_SECURE);
 
+    //static int64_t counter[8] = {0};
+    //if(counter[plat_my_core_pos()] == 0)
+    //{
+    //    NOTICE(">>>>>>>>EL3 FIQ Heartbeat(%u): ELR_EL3=%p\n", plat_my_core_pos(),(void*) SMC_GET_EL3(handle, CTX_ELR_EL3));
+    //}
+    //counter[plat_my_core_pos()] = (counter[plat_my_core_pos()] + 1) % 2000;
 
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     cm_set_elr_el3(SECURE, ctx->el1_fiq_handler);
 
     //el3_state_t *el3_state = get_el3state_ctx(handle);
     //write_ctx_reg(get_sysregs_ctx(ctx), CTX_ESR_EL1, read_ctx_reg(el3_state, CTX_ESR_EL1));
+
 
     cm_el1_sysregs_context_restore(SECURE);
     fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
@@ -236,7 +243,7 @@ certikos_el3_smc_handler(
 
                 ns_ctx = cm_get_context(NON_SECURE);
                 cm_el1_sysregs_context_restore(NON_SECURE);
-                fpregs_context_restore(get_fpregs_ctx(cm_get_context(NON_SECURE)));
+                fpregs_context_restore(get_fpregs_ctx(ns_ctx));
                 cm_set_next_eret_context(NON_SECURE);
 
                 SMC_RET0(ns_ctx);
