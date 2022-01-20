@@ -19,11 +19,11 @@ func certikos_el3_world_switch_return
 
 	/* Save callee-saved registers on to the stack */
 	stp	x19, x20, [sp, #0x00]
-	stp	x21, x22, [sp, #0x08]
-	stp	x23, x24, [sp, #0x10]
-	stp	x25, x26, [sp, #0x18]
-	stp	x27, x28, [sp, #0x20]
-	stp	x29, x30, [sp, #0x28]
+	stp	x21, x22, [sp, #0x10]
+	stp	x23, x24, [sp, #0x20]
+	stp	x25, x26, [sp, #0x30]
+	stp	x27, x28, [sp, #0x40]
+	stp	x29, x30, [sp, #0x50]
 
 	/* ---------------------------------------------
 	 * Everything is setup now. el3_exit() will
@@ -53,11 +53,11 @@ func certikos_el3_world_switch_enter
 
 	/* Restore callee-saved registers on to the stack */
 	ldp	x19, x20, [x0, #(0x00 - 8*12)]
-	ldp	x21, x22, [x0, #(0x08 - 8*12)]
-	ldp	x23, x24, [x0, #(0x10 - 8*12)]
-	ldp	x25, x26, [x0, #(0x18 - 8*12)]
-	ldp	x27, x28, [x0, #(0x20 - 8*12)]
-	ldp	x29, x30, [x0, #(0x28 - 8*12)]
+	ldp	x21, x22, [x0, #(0x10 - 8*12)]
+	ldp	x23, x24, [x0, #(0x20 - 8*12)]
+	ldp	x25, x26, [x0, #(0x30 - 8*12)]
+	ldp	x27, x28, [x0, #(0x40 - 8*12)]
+	ldp	x29, x30, [x0, #(0x50 - 8*12)]
 
 	/* ---------------------------------------------
 	 * This should take us back to the instruction

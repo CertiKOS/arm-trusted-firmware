@@ -215,12 +215,10 @@ void psci_cpu_on_finish(unsigned int cpu_idx, const psci_power_state_t *state_in
 	 * Dispatcher to let it do any bookeeping. If the handler encounters an
 	 * error, it's expected to assert within
 	 */
-    NOTICE("before=%p\n", &psci_cpu_pd_nodes[cpu_idx].mpidr);
 	if ((psci_spd_pm != NULL) && (psci_spd_pm->svc_on_finish != NULL))
 		psci_spd_pm->svc_on_finish(0);
 
 	PUBLISH_EVENT(psci_cpu_on_finish);
-    NOTICE("after=%p\n", &psci_cpu_pd_nodes[cpu_idx].mpidr);
 
 
 	/* Populate the mpidr field within the cpu node array */

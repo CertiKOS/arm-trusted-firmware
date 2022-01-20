@@ -165,8 +165,9 @@ certikos_el3_cpu_on_finish(u_register_t v)
         NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
 
         uint64_t ret = certikos_el3_world_switch_return(&ctx->saved_sp);
+        (void)(ret);
+
         NOTICE("BL31: Finished booting CertiKOS on core %u\n", plat_my_core_pos());
-        NOTICE("BL31: ret=%llu\n", ret);
 
         //cm_el1_sysregs_context_restore(NON_SECURE);
         //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
@@ -251,7 +252,6 @@ certikos_el3_smc_handler(
 #if CTX_INCLUDE_FPREGS
                 fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
 #endif
-                NOTICE("BL31: Secure World Core Boot Done (%p).\n", (void*)ctx->saved_sp);
 
                 certikos_el3_world_switch_enter(ctx->saved_sp, 0);
 
