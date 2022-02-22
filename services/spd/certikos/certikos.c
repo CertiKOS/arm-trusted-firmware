@@ -6,7 +6,6 @@
  */
 
 #include <assert.h>
-#include <xlat_tables/xlat_tables_v2.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -20,6 +19,8 @@
 #include <smccc.h>
 #include <platform.h>
 #include <uuid.h>
+#include <memctrl.h>
+#include <xlat_tables_v2.h>
 
 #include "sm_err.h"
 #include "smcall.h"
@@ -58,6 +59,84 @@ get_cpu_ctx(void)
 }
 
 
+//#define ELR_HIST_SIZE (5000)
+//
+//typedef struct {
+//    size_t prev_elr_count;
+//    size_t prev_elr;
+//} core_debug_info;
+//
+//static core_debug_info debug_info[PLATFORM_CORE_COUNT] = {0};
+//
+//void core_debug_handle_fiq(core_debug_info* debug_info)
+//{
+//    cpu_context_t* ns_context = cm_get_context(NON_SECURE);
+//
+//    uintptr_t elr_el3 = read_ctx_reg(get_el3state_ctx(ns_context), CTX_ELR_EL3);
+//
+//    if(elr_el3 == debug_info->prev_elr)
+//    {
+//        debug_info->prev_elr_count++;
+//
+//        if(debug_info->prev_elr_count >= ELR_HIST_SIZE)
+//        {
+//            NOTICE("CORE %u STUCK FOR %u TICKS AT %p\n",
+//                plat_my_core_pos(),
+//                ELR_HIST_SIZE,
+//                (void*)debug_info->prev_elr);
+//
+//
+//            uintptr_t ttbr1_el1 = read_ctx_reg(get_sysregs_ctx(ns_context), CTX_TTBR1_EL1);
+//
+//            NOTICE("  - ESR_EL1 %p\n",
+//                (void*)read_ctx_reg(get_sysregs_ctx(ns_context), CTX_ESR_EL1));
+//            NOTICE("  - TTBR1_EL1 %p\n", (void*)ttbr1_el1);
+//
+//            size_t l1_index = (debug_info->prev_elr >> 30) & 0x1FF;
+//            size_t l2_index = (debug_info->prev_elr >> 21) & 0x1FF;
+//            size_t l3_index = (debug_info->prev_elr >> 12) & 0x1FF;
+//
+//            NOTICE("  - l1_index=%lu, l2_index=%lu, l3_index=%lu\n",
+//                l1_index, l2_index, l3_index);
+//
+//            uint32_t ret =
+//                mmap_add_dynamic_region(ttbr1_el1, ttbr1_el1, 0x1000, MT_RO_DATA);
+//
+//            uint64_t l1_desc = ((uint64_t*)ttbr1_el1)[l1_index];
+//            uintptr_t l2_addr = (l1_desc) & 0xFFFFFF000ull;
+//            NOTICE("  - l1_desc=%lx, l2_addr=%lx\n", l1_desc, l2_addr);
+//
+//            ret = mmap_add_dynamic_region(l2_addr, l2_addr, 0x1000, MT_RO_DATA);
+//
+//            uint64_t l2_desc = ((uint64_t*)l2_addr)[l2_index];
+//
+//            if((l2_desc & 0x3) == 0x1)
+//            {
+//                uintptr_t mem_addr = (l2_desc & 0xFFFFFFE00000llu) | (debug_info->prev_elr & 0x1FFFFFllu);
+//                uintptr_t mem_addr_pg = mem_addr & (~0xFFFllu);
+//
+//                NOTICE("  - l2_desc=%lx, mem_addr=%lx, mem_addr_pg=%lx\n", l2_desc, mem_addr, mem_addr_pg);
+//                ret = mmap_add_dynamic_region(mem_addr_pg, mem_addr_pg, 0x1000, MT_RO_DATA);
+//
+//                NOTICE("  - mem: %x\n", *(uint32_t *)mem_addr);
+//
+//            }
+//            else
+//            {
+//                uintptr_t l3_addr = (l2_desc) & 0xFFFFFF000ull;
+//                NOTICE("  - l2_desc=%lx, l3_addr=%lx\n", l2_desc, l3_addr);
+//            }
+//
+//
+//
+//            (void)ret;
+//
+//            debug_info->prev_elr_count = 0;
+//        }
+//    }
+//    debug_info->prev_elr = elr_el3;
+//}
+
 
 static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
@@ -72,9 +151,17 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
     //static int64_t counter[8] = {0};
     //if(counter[plat_my_core_pos()] == 0)
     //{
-    //    NOTICE(">>>>>>>>EL3 FIQ Heartbeat(%u): ELR_EL3=%p\n", plat_my_core_pos(),(void*) SMC_GET_EL3(handle, CTX_ELR_EL3));
+    //    cpu_context_t* ns_context = cm_get_context(NON_SECURE);
+    //    NOTICE(">>>>>>>>EL3 FIQ Heartbeat(%u): ELR_EL3=%p SP_EL1=%p LR=%p\n",
+    //        plat_my_core_pos(),
+    //        (void*)read_ctx_reg(get_el3state_ctx(ns_context), CTX_ELR_EL3),
+    //        (void*)read_ctx_reg(get_sysregs_ctx(ns_context), CTX_SP_EL1),
+    //        (void*)read_ctx_reg(get_gpregs_ctx(ns_context), CTX_GPREG_LR));
     //}
     //counter[plat_my_core_pos()] = (counter[plat_my_core_pos()] + 1) % 2000;
+
+    //core_debug_handle_fiq(&debug_info[plat_my_core_pos()]);
+
 
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     cm_set_elr_el3(SECURE, ctx->el1_fiq_handler);
@@ -102,26 +189,23 @@ certikos_el3_boot_certikos(void)
     memset(&certikos_ep->args, 0, sizeof(certikos_ep->args));
 
     EP_SET_ST(certikos_ep->h.attr, EP_ST_ENABLE);
-
-#if CTX_INCLUDE_FPREGS
-    fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
-#endif
-    cm_el1_sysregs_context_save(NON_SECURE);
-
     cm_set_context(&ctx->cpu_ctx, SECURE);
     cm_init_my_context(certikos_ep);
 
-    cm_el1_sysregs_context_restore(SECURE);
 #if CTX_INCLUDE_FPREGS
+    fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
     fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
 #endif
+    cm_el1_sysregs_context_save(NON_SECURE);
+    cm_el1_sysregs_context_restore(SECURE);
+
     cm_set_next_eret_context(SECURE);
 
-    NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
+    NOTICE("BL31: CertiKOS SCR=0x%lx\n",
+        read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
     NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
 
     certikos_el3_world_switch_return(&ctx->saved_sp);
-
 
     NOTICE("BL31: Booting Normal World\n");
 
@@ -156,15 +240,17 @@ certikos_el3_cpu_on_finish(uint64_t v)
         NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
         entry_point_info_t core_ep;
 
+        memset(&core_ep, 0, sizeof(core_ep));
+
         core_ep.pc = start_ap_global;
         core_ep.spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
-        memset(&core_ep.args, 0, sizeof(core_ep.args));
+//        memset(&core_ep.args, 0, sizeof(core_ep.args));
         SET_PARAM_HEAD(&core_ep, PARAM_EP, VERSION_1, SECURE | EP_ST_ENABLE |
             ((read_sctlr_el3() & SCTLR_EE_BIT) ? EP_EE_BIG : 0));
 
-#if CTX_INCLUDE_FPREGS
-        fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
-#endif
+//#if CTX_INCLUDE_FPREGS
+//        fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
+//#endif
 
         cm_set_context(&ctx->cpu_ctx, SECURE);
         cm_init_my_context(&core_ep);
@@ -249,18 +335,18 @@ certikos_el3_smc_handler(
         switch(smc_fid) {
             case SMC_FC_FIQ_EXIT:
             case SMC_FC64_FIQ_EXIT:
+                ns_ctx = cm_get_context(NON_SECURE);
+                assert(ns_ctx);
+
                 cm_el1_sysregs_context_save(SECURE);
+                cm_el1_sysregs_context_restore(NON_SECURE);
+
 #if CTX_INCLUDE_FPREGS
                 fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
-#endif
-
-                ns_ctx = cm_get_context(NON_SECURE);
-                cm_el1_sysregs_context_restore(NON_SECURE);
-#if CTX_INCLUDE_FPREGS
                 fpregs_context_restore(get_fpregs_ctx(ns_ctx));
 #endif
-                cm_set_next_eret_context(NON_SECURE);
 
+                cm_set_next_eret_context(NON_SECURE);
                 SMC_RET0(ns_ctx);
 
             case SMC_FC64_ENTRY_DONE:
@@ -274,14 +360,16 @@ certikos_el3_smc_handler(
                 fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
 #endif
 
+                /* restore execution in boot/on_handler */
                 certikos_el3_world_switch_enter(ctx->saved_sp, 0);
 
-                NOTICE("BACK HERE?\n");
-                SMC_RET1(handle, SMC_UNK);
+                assert(0);
+                break;
 
             default:
                 NOTICE("Unknown SMC (id=0x%x)\n", smc_fid);
                 SMC_RET1(handle, SMC_UNK);
+
         }
     } else {
         NOTICE("BL31: SMC fid:%x, x1:%lx, x2:%lx, x3:%lx, x4:%lx\n", smc_fid, x1, x2, x3, x4);

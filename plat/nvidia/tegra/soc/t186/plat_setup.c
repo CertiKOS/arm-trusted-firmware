@@ -220,16 +220,6 @@ static const irq_sec_cfg_t tegra186_sec_irqs[] = {
         INTR_TYPE_S_EL1,
     },
     {
-        TEGRA186_SEC_SGI0_IRQ,
-		TEGRA186_SEC_IRQ_TARGET_MASK,
-        INTR_TYPE_S_EL1,
-    },
-    {
-        TEGRA186_SEC_SGI1_IRQ,
-		TEGRA186_SEC_IRQ_TARGET_MASK,
-        INTR_TYPE_S_EL1,
-    },
-    {
         TEGRA186_GPC_DMA_CH31_IRQ,
 		TEGRA186_SEC_IRQ_TARGET_MASK,
         INTR_TYPE_S_EL1,
