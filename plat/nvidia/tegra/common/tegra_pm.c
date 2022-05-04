@@ -119,7 +119,9 @@ __dead2 void tegra_pwr_domain_power_down_wfi(const psci_power_state_t
 	/* call the chip's power down handler */
 	(void)tegra_soc_pwr_domain_power_down_wfi(target_state);
 
-	wfi();
+
+	while(1) { wfi(); }
+    NOTICE("exiting WFI!!!!!\n"); //TODO certikos disable irqs
 	panic();
 }
 
