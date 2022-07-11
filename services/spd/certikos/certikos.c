@@ -161,6 +161,12 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
     //counter[plat_my_core_pos()] = (counter[plat_my_core_pos()] + 1) % 2000;
 
     //core_debug_handle_fiq(&debug_info[plat_my_core_pos()]);
+        //cpu_context_t* ns_context = cm_get_context(NON_SECURE);
+        //NOTICE(">>>>>>>>EL3 FIQ Heartbeat(%u): ELR_EL3=%p SP_EL1=%p LR=%p\n",
+        //    plat_my_core_pos(),
+        //    (void*)read_ctx_reg(get_el3state_ctx(ns_context), CTX_ELR_EL3),
+        //    (void*)read_ctx_reg(get_sysregs_ctx(ns_context), CTX_SP_EL1),
+        //    (void*)read_ctx_reg(get_gpregs_ctx(ns_context), CTX_GPREG_LR));
 
 
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
@@ -235,7 +241,7 @@ certikos_el3_cpu_on_finish(uint64_t v)
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     if(ctx->saved_sp == NULL)
     {
-        assert(MULTICORE_ENABLE && "Multicore Disabled");
+        //assert(MULTICORE_ENABLE && "Multicore Disabled");
 
         NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
         entry_point_info_t core_ep;
@@ -265,9 +271,12 @@ certikos_el3_cpu_on_finish(uint64_t v)
         NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
 
 
+#if MULTICORE_ENABLE
         certikos_el3_world_switch_return(&ctx->saved_sp);
         NOTICE("BL31: Finished booting CertiKOS on core %u\n", plat_my_core_pos());
-
+#else
+        NOTICE("BL31: Skipped booting CertiKOS on core %u\n", plat_my_core_pos());
+#endif
         //cm_el1_sysregs_context_restore(NON_SECURE);
         //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
         //cm_set_next_eret_context(NON_SECURE);
