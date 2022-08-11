@@ -116,7 +116,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	}
 
 
-    plat_params->tzdram_size = 0x10000000; /* RTH: 256MB */
+    plat_params->tzdram_size = 0x14000000; /* RTH: 256 + 64MB */
     plat_params->tzdram_base = 0x260000000;
 
 
