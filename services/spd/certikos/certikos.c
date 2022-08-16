@@ -42,8 +42,11 @@ typedef struct {
     uintptr_t           el1_fiq_handler;
     uintptr_t           el1_smc_handler;
     gp_regs_t           fiq_gpregs;
+    uint64_t            pmuserenr_el0;
     certikos_el3_stack  secure_stack;
 } certikos_el3_cpu_ctx;
+
+
 
 
 uintptr_t start_ap_global;
@@ -56,6 +59,17 @@ get_cpu_ctx(void)
 }
 
 
+static void certkos_el3_swap_extra_regs(certikos_el3_cpu_ctx * ctx)
+{
+    uint64_t saved = ctx->pmuserenr_el0;
+    uint64_t current;
+    asm volatile("mrs %0, pmuserenr_el0" : "=r"(current));
+    asm volatile("msr pmuserenr_el0, %0":: "r"(saved));
+    ctx->pmuserenr_el0 = current;
+}
+
+
+
 static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 {
@@ -66,7 +80,9 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 #endif
     cm_el1_sysregs_context_save(NON_SECURE);
 
+
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
+    certkos_el3_swap_extra_regs(ctx);
     cm_set_elr_el3(SECURE, ctx->el1_fiq_handler);
 
 #if CTX_INCLUDE_FPREGS
@@ -226,7 +242,7 @@ certikos_el3_smc_handler(
         u_register_t flags)
 {
     cpu_context_t *ns_ctx = cm_get_context(NON_SECURE);
-    certikos_el3_cpu_ctx * ctx;
+    certikos_el3_cpu_ctx * ctx = get_cpu_ctx();
 
     if(is_caller_secure(flags)) {
         switch(smc_fid) {
@@ -240,10 +256,12 @@ certikos_el3_smc_handler(
                 cm_el1_sysregs_context_restore(NON_SECURE);
                 cm_set_next_eret_context(NON_SECURE);
 
+                certkos_el3_swap_extra_regs(ctx);
+
                 SMC_RET0(ns_ctx);
 
             case SMC_FC64_ENTRY_DONE:
-                ctx = get_cpu_ctx();
+
                 ctx->el1_fiq_handler = x1;
                 ctx->el1_smc_handler = x2;
                 start_ap_global = x3;
@@ -252,6 +270,7 @@ certikos_el3_smc_handler(
 #if CTX_INCLUDE_FPREGS
                 fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
 #endif
+                certkos_el3_swap_extra_regs(ctx);
 
                 certikos_el3_world_switch_enter(ctx->saved_sp, 0);
 
