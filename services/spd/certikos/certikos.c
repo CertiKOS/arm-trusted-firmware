@@ -68,6 +68,15 @@ static void certkos_el3_swap_extra_regs(certikos_el3_cpu_ctx * ctx)
     ctx->pmuserenr_el0 = current;
 }
 
+
+//static void debug_putc_uartc(char c)
+//{
+//    uintptr_t base = 0x0c280000u;
+//    while((volatile char*)(base + 0x14) == 0);
+//
+//    *((volatile char*) base) = c;
+//}
+
 //#define ELR_HIST_SIZE (5000)
 //
 //typedef struct {
@@ -151,6 +160,8 @@ static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 {
     /* Switch to secure world */
+    //putchar('F');
+    //debug_putc_uartc('<');
 
 #if CTX_INCLUDE_FPREGS
     fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
@@ -217,6 +228,11 @@ certikos_el3_boot_certikos(void)
 
     cm_set_next_eret_context(SECURE);
 
+    /* take Aborts and SErrors to EL3 */
+    uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
+    scr_el3 |= SCR_EA_BIT;
+    write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
+
     NOTICE("BL31: CertiKOS SCR=0x%lx\n",
         read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
     NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
@@ -227,9 +243,11 @@ certikos_el3_boot_certikos(void)
 
     cm_el1_sysregs_context_restore(NON_SECURE);
 #if CTX_INCLUDE_FPREGS
-    fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
+    fpregs_context_restore(get_fpregs_ctx(cm_get_context(NON_SECURE)));
 #endif
     cm_set_next_eret_context(NON_SECURE);
+
+    /* take Aborts and SErrors to EL3 */
 
 
     return 1;
@@ -276,6 +294,11 @@ certikos_el3_cpu_on_finish(uint64_t v)
         fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
 #endif
         cm_set_next_eret_context(SECURE);
+
+        /* take Aborts and SErrors to EL3 */
+        uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
+        scr_el3 |= SCR_EA_BIT;
+        write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
 
         NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
         NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
@@ -346,6 +369,8 @@ certikos_el3_smc_handler(
     cpu_context_t *ns_ctx;
     certikos_el3_cpu_ctx * ctx = get_cpu_ctx();
 
+    //u_register_t scr_el3;
+
     (void)(ns_ctx);
 
 
@@ -366,7 +391,16 @@ certikos_el3_smc_handler(
 #endif
                 certkos_el3_swap_extra_regs(ctx);
 
+                //scr_el3 = read_ctx_reg(
+                //    get_el3state_ctx(cm_get_context(NON_SECURE)), CTX_SCR_EL3);
+                //scr_el3 |= SCR_EA_BIT;
+                //write_ctx_reg(
+                //    get_el3state_ctx(cm_get_context(NON_SECURE)), CTX_SCR_EL3, scr_el3);
+
+
                 cm_set_next_eret_context(NON_SECURE);
+                //debug_putc_uartc('>');
+                //putchar('>');
                 SMC_RET0(ns_ctx);
 
             case SMC_FC64_ENTRY_DONE:
@@ -379,6 +413,7 @@ certikos_el3_smc_handler(
                 fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
 #endif
                 certkos_el3_swap_extra_regs(ctx);
+
 
                 /* restore execution in boot/on_handler */
                 certikos_el3_world_switch_enter(ctx->saved_sp, 0);
