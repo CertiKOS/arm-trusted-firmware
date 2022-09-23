@@ -229,9 +229,9 @@ certikos_el3_boot_certikos(void)
     cm_set_next_eret_context(SECURE);
 
     /* take Aborts and SErrors to EL3 */
-    uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
-    scr_el3 |= SCR_EA_BIT;
-    write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
+    //uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
+    //scr_el3 |= SCR_EA_BIT;
+    //write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
 
     NOTICE("BL31: CertiKOS SCR=0x%lx\n",
         read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
@@ -296,9 +296,9 @@ certikos_el3_cpu_on_finish(uint64_t v)
         cm_set_next_eret_context(SECURE);
 
         /* take Aborts and SErrors to EL3 */
-        uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
-        scr_el3 |= SCR_EA_BIT;
-        write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
+        //uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
+        //scr_el3 |= SCR_EA_BIT;
+        //write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
 
         NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
         NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
