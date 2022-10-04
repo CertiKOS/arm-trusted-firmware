@@ -119,8 +119,10 @@ __dead2 void tegra_pwr_domain_power_down_wfi(const psci_power_state_t
 	/* call the chip's power down handler */
 	(void)tegra_soc_pwr_domain_power_down_wfi(target_state);
 
+    u_register_t daif = (DAIF_ABT_BIT | DAIF_DBG_BIT | DAIF_FIQ_BIT | DAIF_IRQ_BIT);
+    asm volatile("msr daif, %0" :: "r"(daif));
 
-	while(1) { wfi(); }
+	wfi();
     NOTICE("exiting WFI!!!!!\n"); //TODO certikos disable irqs
 	panic();
 }

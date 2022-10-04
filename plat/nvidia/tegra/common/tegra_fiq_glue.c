@@ -48,6 +48,8 @@ static uint64_t tegra_fiq_interrupt_handler(uint32_t id,
 	(void)handle;
 	(void)cookie;
 
+    panic();
+
 	/*
 	 * Read the pending interrupt ID
 	 */

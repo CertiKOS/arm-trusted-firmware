@@ -34,6 +34,8 @@ void tegra_gic_cpuif_deactivate(void)
 {
 	uint32_t val;
 
+    NOTICE("gic deactivate$\n");
+
 	/* Disable secure, non-secure interrupts and disable their bypass */
 	val = gicc_read_ctlr(TEGRA_GICC_BASE);
 	val &= ~(ENABLE_GRP0 | ENABLE_GRP1);

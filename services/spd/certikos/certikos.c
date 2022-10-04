@@ -21,6 +21,8 @@
 #include <uuid.h>
 #include <memctrl.h>
 #include <xlat_tables_v2.h>
+#include <mce.h>
+#include <tegra_gic.h>
 
 #include "sm_err.h"
 #include "smcall.h"
@@ -191,7 +193,7 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
     certkos_el3_swap_extra_regs(ctx);
-    cm_set_elr_el3(SECURE, ctx->el1_fiq_handler);
+    cm_set_elr_spsr_el3(SECURE, ctx->el1_fiq_handler, SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS));
 
 
     cm_el1_sysregs_context_restore(SECURE);
@@ -211,6 +213,7 @@ certikos_el3_boot_certikos(void)
     certikos_el3_cpu_ctx *ctx = get_cpu_ctx();
 
     NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
+
 
     certikos_ep->spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
     memset(&certikos_ep->args, 0, sizeof(certikos_ep->args));
@@ -232,6 +235,9 @@ certikos_el3_boot_certikos(void)
     //uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
     //scr_el3 |= SCR_EA_BIT;
     //write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
+
+    //NOTICE("Enabling TegraX2 SERR\n");
+    //mce_command_handler(MCE_CMD_ENUM_WRITE_MCA, 0x120002, 1, 0);
 
     NOTICE("BL31: CertiKOS SCR=0x%lx\n",
         read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
@@ -258,6 +264,7 @@ static int32_t
 certikos_el3_cpu_off(uint64_t v)
 {
     NOTICE("certikos el3 cpu off %u\n", plat_my_core_pos());
+    tegra_gic_cpuif_deactivate();
     return 0;
 }
 
@@ -272,10 +279,10 @@ certikos_el3_cpu_on_finish(uint64_t v)
         //assert(MULTICORE_ENABLE && "Multicore Disabled");
 
         NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
+
+
         entry_point_info_t core_ep;
-
         memset(&core_ep, 0, sizeof(core_ep));
-
         core_ep.pc = start_ap_global;
         core_ep.spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
 //        memset(&core_ep.args, 0, sizeof(core_ep.args));
@@ -299,6 +306,9 @@ certikos_el3_cpu_on_finish(uint64_t v)
         //uint64_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
         //scr_el3 |= SCR_EA_BIT;
         //write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr_el3);
+
+        //NOTICE("Enabling TegraX2 SERR\n");
+        //mce_command_handler(MCE_CMD_ENUM_WRITE_MCA, 0x120002, 1, 0);
 
         NOTICE("BL31: CertiKOS SCR=0x%lx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
         NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
