@@ -457,7 +457,8 @@ uint64_t ari_read_write_mca(uint32_t ari_base, uint64_t cmd, uint64_t *data)
 		}
 	}
 
-    NOTICE("ARI R/W MCA %p, cmd=%lx\n", (void*)(uintptr_t)ari_base, cmd);
+    // RTH debugging serror
+    //NOTICE("ARI R/W MCA %p, cmd=%lx\n", (void*)(uintptr_t)ari_base, cmd);
 
 	return result;
 }

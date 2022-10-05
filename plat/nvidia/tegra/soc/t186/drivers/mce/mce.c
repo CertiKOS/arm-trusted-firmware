@@ -159,7 +159,8 @@ int32_t mce_command_handler(uint64_t cmd, uint64_t arg0, uint64_t arg1,
 	uint64_t ret64 = 0, arg3, arg4, arg5;
 	int32_t ret = 0;
 
-    NOTICE("MCE COMMAND cmd=%lx, arg0=%lx, arg1=%lx, arg2=%lx\n", cmd, arg0, arg1, arg2);
+    // RTH debugging serror
+    //NOTICE("MCE COMMAND cmd=%lx, arg0=%lx, arg1=%lx, arg2=%lx\n", cmd, arg0, arg1, arg2);
 
 	assert(gp_regs != NULL);
 
