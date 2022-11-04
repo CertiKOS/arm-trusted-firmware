@@ -101,11 +101,17 @@
  * Put BL31 at the top of the Trusted SRAM. BL31_BASE is calculated using the
  * current BL31 debug size plus a little space for growth.
  */
-#define PLAT_MAX_BL31_SIZE		ULL(0x80000)
+#define PLAT_MAX_BL31_SIZE		ULL(0x20000000)
 
 #define BL31_BASE			ULL(0x1000)
-#define BL31_LIMIT			ULL(0x80000)
-#define BL31_PROGBITS_LIMIT		ULL(0x80000)
+#define BL31_LIMIT			ULL(0x20000000)
+#define BL31_PROGBITS_LIMIT		ULL(0x20000000)
+
+//#define PLAT_MAX_BL31_SIZE		ULL(0x80000)
+//
+//#define BL31_BASE			ULL(0x1000)
+//#define BL31_LIMIT			ULL(0x80000)
+//#define BL31_PROGBITS_LIMIT		ULL(0x80000)
 
 #define SEC_SRAM_ID			0
 #define SEC_DRAM_ID			1
@@ -113,8 +119,8 @@
 /*
  * Other memory-related defines.
  */
-#define PLAT_PHY_ADDR_SPACE_SIZE	(ULL(1) << 32)
-#define PLAT_VIRT_ADDR_SPACE_SIZE	(ULL(1) << 32)
+#define PLAT_PHY_ADDR_SPACE_SIZE	(ULL(1) << 36)
+#define PLAT_VIRT_ADDR_SPACE_SIZE	(ULL(1) << 36)
 
 #define MAX_MMAP_REGIONS		8
 #define MAX_XLAT_TABLES			4

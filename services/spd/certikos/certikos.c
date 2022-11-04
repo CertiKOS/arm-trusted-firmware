@@ -28,7 +28,6 @@
 /* Set this to zero to disable */
 #define MULTICORE_ENABLE        (1)
 
-
 typedef struct {
     uint8_t space[PLATFORM_STACK_SIZE] __aligned(16);
     uint32_t end;
@@ -69,6 +68,11 @@ static void certkos_el3_swap_extra_regs(certikos_el3_cpu_ctx * ctx)
 }
 
 
+extern uint8_t certikos_kernel_start[];
+extern uint8_t certikos_kernel_end[];
+extern int certikos_kernel_size;
+
+
 
 static uint64_t
 certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
@@ -94,18 +98,36 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
     SMC_RET0(&ctx->cpu_ctx);
 }
 
+
 static int32_t
 certikos_el3_boot_certikos(void)
 {
     entry_point_info_t * certikos_ep = bl31_plat_get_next_image_ep_info(SECURE);
     certikos_el3_cpu_ctx * ctx = get_cpu_ctx();
 
+    entry_point_info_t * linux_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
+    NOTICE("BL31: LINUX PC=%p\n", (void*)linux_ep->pc);
+    NOTICE("BL31: LINUX ARG0=%p\n", (void*)linux_ep->args.arg0);
+    NOTICE("BL31: LINUX ARG1=%p\n", (void*)linux_ep->args.arg1);
+    NOTICE("BL31: LINUX ARG2=%p\n", (void*)linux_ep->args.arg2);
+    NOTICE("BL31: LINUX ARG3=%p\n", (void*)linux_ep->args.arg3);
+
     NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
+
 
     certikos_ep->spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
     memset(&certikos_ep->args, 0, sizeof(certikos_ep->args));
 
+    char * certikos_link_addr = (char *)(CERTIKOS_KERNEL_BIN_LINK_ADDR);
+
+    memcpy(certikos_link_addr, certikos_kernel_start, certikos_kernel_size);
+    flush_dcache_range((uintptr_t)certikos_link_addr, certikos_kernel_size);
+    inv_dcache_range((uintptr_t)certikos_link_addr, certikos_kernel_size);
+
+    certikos_ep->pc = (uintptr_t)certikos_link_addr;
+
     EP_SET_ST(certikos_ep->h.attr, EP_ST_ENABLE);
+
 
 #if CTX_INCLUDE_FPREGS
     fpregs_context_save(get_fpregs_ctx(cm_get_context(NON_SECURE)));
@@ -121,9 +143,12 @@ certikos_el3_boot_certikos(void)
     cm_el1_sysregs_context_restore(SECURE);
     cm_set_next_eret_context(SECURE);
 
-    NOTICE("BL31: CertiKOS SCR=0x%llx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
-    NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
+    uint64_t scr = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
+    write_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3, scr & ~(SCR_SIF_BIT));
 
+    NOTICE("BL31: CertiKOS SCR=0x%llx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
+    NOTICE("BL31: CertiKOS SCTLR=0x%llx\n", read_ctx_reg(get_el1_sysregs_ctx(ctx), CTX_SCTLR_EL1));
+    NOTICE("BL31: CertiKOS PC=%p\n", (void*)certikos_ep->pc);
 
     certikos_el3_world_switch_return(&ctx->saved_sp);
 
@@ -217,6 +242,8 @@ certikos_el3_setup(void)
 
 
     NOTICE("BL31: Starting CertiKOS Service\n");
+    NOTICE("BL31: CertiKOS BIN ADDR %p\n", certikos_kernel_start);
+    NOTICE("BL31: CertiKOS BIN SIZE %d\n", certikos_kernel_size);
 
     /* Tell the framework to route Secure World FIQs to EL3 during NS execution */
     uint32_t flags = 0;

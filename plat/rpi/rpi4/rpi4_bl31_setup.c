@@ -46,6 +46,8 @@ static const gicv2_driver_data_t rpi4_gic_data = {
 static entry_point_info_t bl32_image_ep_info;
 static entry_point_info_t bl33_image_ep_info;
 
+uintptr_t bl32_load_address = (uintptr_t)CERTIKOS_KERNEL_BIN_LINK_ADDR;
+
 /*******************************************************************************
  * Return a pointer to the 'entry_point_info' structure of the next image for
  * the security state specified. BL33 corresponds to the non-secure image type
@@ -190,6 +192,12 @@ void bl31_plat_arch_setup(void)
 	 */
 	mmap_add_region(0, 0, 4096, MT_NON_CACHEABLE | MT_RW | MT_SECURE);
 
+    //RTH
+    NOTICE("Adding mmap region for CertiKOS kernel @%p\n", (void*)bl32_load_address);
+    mmap_add_region(bl32_load_address, bl32_load_address,
+        16*1024*1024, MT_MEMORY | MT_RW | MT_SECURE);
+
+
 	rpi3_setup_page_tables(BL31_BASE, BL31_END - BL31_BASE,
 			       BL_CODE_BASE, BL_CODE_END,
 			       BL_RO_DATA_BASE, BL_RO_DATA_END
@@ -246,6 +254,14 @@ static void rpi4_prepare_dtb(void)
 
 	clean_dcache_range((uintptr_t)dtb, fdt_blob_size(dtb));
 	INFO("Changed device tree to advertise PSCI.\n");
+
+
+    NOTICE("Reserving CertiKOS Memory in Device Tree...\n");
+	NOTICE("Found %d mem reserve region(s)\n", fdt_num_mem_rsv(dtb));
+	if (fdt_add_reserved_memory(dtb, "CertiKOS@"  , bl32_load_address, 512*1024*1024))
+    {
+        WARN("Failed to add CertiKOS reservation in device tree (%d)\n", ret);
+    }
 }
 
 void bl31_platform_setup(void)
