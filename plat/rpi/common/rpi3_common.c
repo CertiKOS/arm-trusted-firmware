@@ -122,16 +122,17 @@ void rpi3_console_init(void)
 
 	rpi3_gpio_init();
 
-	if (rpi3_use_mini_uart())
+	if (rpi3_use_mini_uart()) {
 		rc = console_16550_register(PLAT_RPI_MINI_UART_BASE,
 					    0,
 					    PLAT_RPI_UART_BAUDRATE,
 					    &rpi3_console);
-	else
+	} else {
 		rc = console_pl011_register(PLAT_RPI_PL011_UART_BASE,
 					    PLAT_RPI_PL011_UART_CLOCK,
 					    PLAT_RPI_UART_BAUDRATE,
 					    &rpi3_console);
+    }
 
 	if (rc == 0) {
 		/*
@@ -143,6 +144,11 @@ void rpi3_console_init(void)
 	}
 
 	console_set_scope(&rpi3_console, console_scope);
+	if (rpi3_use_mini_uart()) {
+        NOTICE("BL31: Using MINI UART (%p)\n", (void*)PLAT_RPI_MINI_UART_BASE);
+	} else {
+        NOTICE("BL31: Using PL011 UART (%p)\n", (void*)PLAT_RPI_PL011_UART_BASE);
+    }
 }
 
 /*******************************************************************************
@@ -160,7 +166,7 @@ void rpi3_setup_page_tables(uintptr_t total_base, size_t total_size,
 	 * Map the Trusted SRAM with appropriate memory attributes.
 	 * Subsequent mappings will adjust the attributes for specific regions.
 	 */
-	VERBOSE("Trusted SRAM seen by this BL image: %p - %p\n",
+	NOTICE("Trusted SRAM seen by this BL image: %p - %p\n",
 		(void *) total_base, (void *) (total_base + total_size));
 	mmap_add_region(total_base, total_base,
 			total_size,
@@ -225,11 +231,11 @@ unsigned int plat_get_syscnt_freq2(void)
 	return SYS_COUNTER_FREQ_IN_TICKS;
 }
 
-uint32_t plat_ic_get_pending_interrupt_type(void)
-{
-	ERROR("rpi3: Interrupt routed to EL3.\n");
-	return INTR_TYPE_INVAL;
-}
+//uint32_t plat_ic_get_pending_interrupt_type(void)
+//{
+//	ERROR("rpi3: Interrupt routed to EL3.\n");
+//	return INTR_TYPE_INVAL;
+//}
 
 uint32_t plat_interrupt_type_to_line(uint32_t type, uint32_t security_state)
 {

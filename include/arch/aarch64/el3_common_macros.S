@@ -320,7 +320,7 @@
 	 * Set the exception vectors.
 	 * ---------------------------------------------------------------------
 	 */
-	adr	x0, \_exception_vectors
+	adrp	x0, \_exception_vectors
 	msr	vbar_el3, x0
 	isb
 
