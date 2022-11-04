@@ -110,7 +110,7 @@ static int load_image(unsigned int image_id, image_info_t *image_data)
 
 	/* Check that the image size to load is within limit */
 	if (image_size > image_data->image_max_size) {
-		WARN("Image id=%u size out of bounds (size=%llu, max=%llu)\n", image_id, image_size, image_data->image_max_size);
+		WARN("Image id=%u size out of bounds (size=%lu, max=%lu)\n", image_id, image_size, image_data->image_max_size);
 		io_result = -EFBIG;
 		goto exit;
 	}
