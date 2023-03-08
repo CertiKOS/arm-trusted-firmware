@@ -10,6 +10,9 @@ SPD_SOURCES		:=	services/spd/certikos/certikos.c \
 					services/spd/certikos/helpers.S \
 					services/spd/certikos/bl32.bin.S
 
+.PHONY: services/spd/certikos/bl32.bin.S
+
+
 #ifeq (${TRUSTY_SPD_WITH_GENERIC_SERVICES},1)
 #SPD_SOURCES		+=	services/spd/trusty/generic-arm64-smcall.c
 #endif
