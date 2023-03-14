@@ -376,8 +376,9 @@ certikos_el3_smc_handler(
         void *handle,
         u_register_t flags)
 {
-    cpu_context_t *ns_ctx;
     certikos_el3_cpu_ctx * ctx = get_cpu_ctx();
+    cpu_context_t *ns_ctx = cm_get_context(NON_SECURE);
+    assert(ns_ctx);
 
     //u_register_t scr_el3;
 
@@ -389,8 +390,6 @@ certikos_el3_smc_handler(
         switch(smc_fid) {
             case SMC_FC_FIQ_EXIT:
             case SMC_FC64_FIQ_EXIT:
-                ns_ctx = cm_get_context(NON_SECURE);
-                assert(ns_ctx);
 
                 cm_el1_sysregs_context_save(SECURE);
                 cm_el1_sysregs_context_restore(NON_SECURE);
@@ -494,6 +493,7 @@ certikos_el3_smc_handler(
                     certkos_el3_swap_extra_regs(ctx);
 
                     SMC_RET0(ns_ctx);
+                }
 
             default:
                 NOTICE("Unknown SMC (id=0x%x)\n", smc_fid);

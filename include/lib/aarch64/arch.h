@@ -150,6 +150,7 @@
 #define SCTLR_C_BIT		(U(1) << 2)
 #define SCTLR_SA_BIT		(U(1) << 3)
 #define SCTLR_CP15BEN_BIT	(U(1) << 5)
+#define SCTLR_nAA_BIT	(U(1) << 6)
 #define SCTLR_I_BIT		(U(1) << 12)
 #define SCTLR_NTWI_BIT		(U(1) << 16)
 #define SCTLR_NTWE_BIT		(U(1) << 18)
