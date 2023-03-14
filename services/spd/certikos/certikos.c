@@ -431,6 +431,70 @@ certikos_el3_smc_handler(
                 assert(0);
                 break;
 
+            case SMC_FC64_NEW_VECTOR_TABLE:
+                {
+                    //u_register_t asid_el3   = read_asid_el3();
+                    //u_register_t vbar_el3   = read_vbar_el3();
+                    //u_register_t tcr_el3    = read_tcr_el3();
+                    //u_register_t mair_el3   = read_mair_el3();
+                    //u_register_t ttbr0_el3  = read_ttbr0_el3();
+                    //u_register_t ttbr1_el3  = read_ttbr1_el3();
+                    u_register_t sctlr_el3  = read_sctlr_el3();
+
+                    //u_register_t asid_el1   = read_asid_el1();
+                    //u_register_t vbar_el1   = read_vbar_el1();
+                    //u_register_t tcr_el1    = read_tcr_el1();
+                    u_register_t mair_el1   = read_mair_el1();
+                    u_register_t ttbr0_el1  = read_ttbr0_el1();
+                    //u_register_t ttbr1_el1  = read_ttbr1_el1();
+                    //u_register_t sctlr_el1  = read_sctlr_el1();
+
+                    //NOTICE("Disabling MMU...\n");
+                    write_sctlr_el3(sctlr_el3 & ~(SCTLR_M_BIT));
+
+                    //NOTICE("Swapping EL3 and EL1 Registers...\n");
+
+                    //NOTICE("vbar_el3 : 0x%zx -> 0x%zx\n", vbar_el3 , x4 );
+                    write_vbar_el3(x4);
+                    isb();
+
+                    //NOTICE("mair_el3 : 0x%zx -> 0x%zx\n", mair_el3 , mair_el1 );
+                    write_mair_el3(mair_el1);
+                    isb();
+
+                    //NOTICE("ttbr0_el3: 0x%zx -> 0x%zx\n", ttbr0_el3, ttbr0_el1);
+                    write_ttbr0_el3(ttbr0_el1);
+                    isb();
+
+                    //NOTICE("sctlr_el3: 0x%zx -> 0x%zx\n", sctlr_el3, sctlr_el1);
+                    //write_sctlr_el3(sctlr_el1);
+
+                    //NOTICE("Enabling MMU...\n");
+                    write_sctlr_el3(sctlr_el3
+                        & ~(SCTLR_A_BIT | SCTLR_nAA_BIT | SCTLR_WXN_BIT));
+
+                    isb();
+                    tlbialle3();
+
+
+                    //NOTICE("tcr_el3  : 0x%zx -> 0x%zx\n", tcr_el3  , tcr_el1  );
+                    //NOTICE("ttbr1_el3: %p -> %p\n", ttbr1_el3, ttbr1_el1);
+
+
+                    //while(1);
+
+                    cm_el1_sysregs_context_save(SECURE);
+#if CTX_INCLUDE_FPREGS
+                    fpregs_context_save(get_fpregs_ctx(cm_get_context(SECURE)));
+                    fpregs_context_restore(get_fpregs_ctx(ns_ctx));
+#endif
+                    cm_el1_sysregs_context_restore(NON_SECURE);
+                    cm_set_next_eret_context(NON_SECURE);
+
+                    certkos_el3_swap_extra_regs(ctx);
+
+                    SMC_RET0(ns_ctx);
+
             default:
                 NOTICE("Unknown SMC (id=0x%x)\n", smc_fid);
                 SMC_RET1(handle, SMC_UNK);
