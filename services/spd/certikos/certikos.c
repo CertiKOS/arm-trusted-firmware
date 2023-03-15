@@ -43,7 +43,7 @@ typedef struct {
     gp_regs_t           fiq_gpregs;
     uint64_t            pmuserenr_el0;
     certikos_el3_stack  secure_stack;
-} certikos_el3_cpu_ctx;
+} certikos_el3_cpu_ctx __attribute__((aligned(64)));
 
 
 
@@ -321,6 +321,10 @@ certikos_el3_smc_handler(
                     u_register_t ttbr0_el1  = read_ttbr0_el1();
                     //u_register_t ttbr1_el1  = read_ttbr1_el1();
                     //u_register_t sctlr_el1  = read_sctlr_el1();
+                    //
+
+                    flush_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
+                    flush_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
 
                     //NOTICE("Disabling MMU...\n");
                     write_sctlr_el3(sctlr_el3 & ~(SCTLR_M_BIT));
@@ -348,6 +352,10 @@ certikos_el3_smc_handler(
 
                     isb();
                     tlbialle3();
+                    isb();
+                    inv_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
+                    inv_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
+                    isb();
 
 
                     //NOTICE("tcr_el3  : 0x%zx -> 0x%zx\n", tcr_el3  , tcr_el1  );
