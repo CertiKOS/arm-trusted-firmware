@@ -48,12 +48,12 @@ typedef struct {
 	gp_regs_t	            fiq_gpregs;
     uint64_t                pmuserenr_el0;
 	//certikos_el3_stack  secure_stack;
-} certikos_el3_cpu_ctx;
+} certikos_el3_cpu_ctx __attribute__((aligned(64)));
 
 
 uintptr_t start_ap_global;
 
-static certikos_el3_cpu_ctx cpu_ctx[PLATFORM_CORE_COUNT];
+static certikos_el3_cpu_ctx cpu_ctx[PLATFORM_CORE_COUNT] = {0};
 
 static certikos_el3_cpu_ctx *
 get_cpu_ctx(void)
@@ -432,9 +432,15 @@ certikos_el3_smc_handler(
 
             case SMC_FC64_NEW_VECTOR_TABLE:
                 {
+                    uint64_t i = 0;
+                    while(i++ < 1000000 * plat_my_core_pos());
+                    NOTICE("EL3 Transition! ELR_EL3=%p\n", (void*)read_ctx_reg(get_el3state_ctx(ns_ctx),CTX_ELR_EL3));
+
+
                     //u_register_t asid_el3   = read_asid_el3();
                     //u_register_t vbar_el3   = read_vbar_el3();
                     //u_register_t tcr_el3    = read_tcr_el3();
+
                     //u_register_t mair_el3   = read_mair_el3();
                     //u_register_t ttbr0_el3  = read_ttbr0_el3();
                     //u_register_t ttbr1_el3  = read_ttbr1_el3();
@@ -448,8 +454,17 @@ certikos_el3_smc_handler(
                     //u_register_t ttbr1_el1  = read_ttbr1_el1();
                     //u_register_t sctlr_el1  = read_sctlr_el1();
 
+
+                    //extern uintptr_t __BSS_START__, __BSS_END__;
+                    //flush_dcache_range(__BSS_START__, __BSS_END__ - __BSS_START__);
+                    flush_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
+                    flush_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
+                    NOTICE("EL3 Transition$ ELR_EL3=%p\n", (void*)read_ctx_reg(get_el3state_ctx(ns_ctx),CTX_ELR_EL3));
+
+
+                    //NOTICE("ttbr1_el3: %p -> %p\n", ttbr1_el3, ttbr1_el1);
                     //NOTICE("Disabling MMU...\n");
-                    write_sctlr_el3(sctlr_el3 & ~(SCTLR_M_BIT));
+                    write_sctlr_el3(sctlr_el3 & ~(SCTLR_M_BIT | SCTLR_C_BIT));
 
                     //NOTICE("Swapping EL3 and EL1 Registers...\n");
 
@@ -461,12 +476,10 @@ certikos_el3_smc_handler(
                     write_mair_el3(mair_el1);
                     isb();
 
-                    //NOTICE("ttbr0_el3: 0x%zx -> 0x%zx\n", ttbr0_el3, ttbr0_el1);
+                    ////NOTICE("ttbr0_el3: 0x%zx -> 0x%zx\n", ttbr0_el3, ttbr0_el1);
                     write_ttbr0_el3(ttbr0_el1);
                     isb();
 
-                    //NOTICE("sctlr_el3: 0x%zx -> 0x%zx\n", sctlr_el3, sctlr_el1);
-                    //write_sctlr_el3(sctlr_el1);
 
                     //NOTICE("Enabling MMU...\n");
                     write_sctlr_el3(sctlr_el3
@@ -474,13 +487,19 @@ certikos_el3_smc_handler(
 
                     isb();
                     tlbialle3();
+                    isb();
+
+                    inv_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
+                    inv_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
+                    isb();
+
+                    //NOTICE("sctlr_el3: 0x%zx -> 0x%zx\n", sctlr_el3, sctlr_el1);
 
 
-                    //NOTICE("tcr_el3  : 0x%zx -> 0x%zx\n", tcr_el3  , tcr_el1  );
-                    //NOTICE("ttbr1_el3: %p -> %p\n", ttbr1_el3, ttbr1_el1);
+                    //NOTICE("tcr_el3: 0x%zx tcr_el1: 0x%zx\n", tcr_el3  , tcr_el1  );
 
 
-                    //while(1);
+                    NOTICE("EL3 Transition? ELR_EL3=%p\n", (void*)read_ctx_reg(get_el3state_ctx(ns_ctx),CTX_ELR_EL3));
 
                     cm_el1_sysregs_context_save(SECURE);
 #if CTX_INCLUDE_FPREGS
@@ -491,6 +510,8 @@ certikos_el3_smc_handler(
                     cm_set_next_eret_context(NON_SECURE);
 
                     certkos_el3_swap_extra_regs(ctx);
+
+                    NOTICE("EL3 Transition. ELR_EL3=%p\n", (void*)read_ctx_reg(get_el3state_ctx(ns_ctx),CTX_ELR_EL3));
 
                     SMC_RET0(ns_ctx);
                 }
