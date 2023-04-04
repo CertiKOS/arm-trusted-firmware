@@ -31,10 +31,11 @@
 typedef struct {
     uint8_t space[PLATFORM_STACK_SIZE] __aligned(16);
     uint32_t end;
+	uint32_t padding;
 } certikos_el3_stack;
 
 
-typedef struct {
+typedef struct __attribute__((aligned(64))) {
     cpu_context_t       cpu_ctx;
     void                *saved_sp;
     uint32_t            saved_security_state;
@@ -43,9 +44,8 @@ typedef struct {
     gp_regs_t           fiq_gpregs;
     uint64_t            pmuserenr_el0;
     certikos_el3_stack  secure_stack;
-} certikos_el3_cpu_ctx __attribute__((aligned(64)));
-
-
+	uint8_t				padding[48];
+} certikos_el3_cpu_ctx;
 
 
 uintptr_t start_ap_global;
