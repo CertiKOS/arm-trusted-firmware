@@ -105,12 +105,12 @@ certikos_el3_boot_certikos(void)
     entry_point_info_t * certikos_ep = bl31_plat_get_next_image_ep_info(SECURE);
     certikos_el3_cpu_ctx * ctx = get_cpu_ctx();
 
-    entry_point_info_t * linux_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
-    NOTICE("BL31: LINUX PC=%p\n", (void*)linux_ep->pc);
-    NOTICE("BL31: LINUX ARG0=%p\n", (void*)linux_ep->args.arg0);
-    NOTICE("BL31: LINUX ARG1=%p\n", (void*)linux_ep->args.arg1);
-    NOTICE("BL31: LINUX ARG2=%p\n", (void*)linux_ep->args.arg2);
-    NOTICE("BL31: LINUX ARG3=%p\n", (void*)linux_ep->args.arg3);
+    //entry_point_info_t * linux_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
+    //NOTICE("BL31: LINUX PC=%p\n", (void*)linux_ep->pc);
+    //NOTICE("BL31: LINUX ARG0=%p\n", (void*)linux_ep->args.arg0);
+    //NOTICE("BL31: LINUX ARG1=%p\n", (void*)linux_ep->args.arg1);
+    //NOTICE("BL31: LINUX ARG2=%p\n", (void*)linux_ep->args.arg2);
+    //NOTICE("BL31: LINUX ARG3=%p\n", (void*)linux_ep->args.arg3);
 
     NOTICE("BL31: Booting CertiKOS on core %u\n", plat_my_core_pos());
 
