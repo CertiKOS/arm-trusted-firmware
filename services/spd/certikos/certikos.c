@@ -208,7 +208,7 @@ certikos_el3_cpu_on_finish(u_register_t v)
         uint64_t ret = certikos_el3_world_switch_return(&ctx->saved_sp);
         (void)(ret);
 
-        NOTICE("BL31: Finished booting CertiKOS on core %u\n", plat_my_core_pos());
+        //NOTICE("BL31: Finished booting CertiKOS on core %u\n", plat_my_core_pos());
 
         //cm_el1_sysregs_context_restore(NON_SECURE);
         //fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
@@ -346,16 +346,23 @@ certikos_el3_smc_handler(
                     //NOTICE("sctlr_el3: 0x%zx -> 0x%zx\n", sctlr_el3, sctlr_el1);
                     //write_sctlr_el3(sctlr_el1);
 
-                    //NOTICE("Enabling MMU...\n");
+                    //size_t i;
+                    //for(i = 0; i < 1000*1000*plat_my_core_pos(); i++)
+                    //{
+                    //}
+                    //NOTICE("Enabling MMU...  %p\n", &i);
                     write_sctlr_el3(sctlr_el3
                         & ~(SCTLR_A_BIT | SCTLR_nAA_BIT | SCTLR_WXN_BIT));
 
                     isb();
+                    dsbsy();
                     tlbialle3();
                     isb();
                     inv_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
                     inv_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
+                    asm volatile("ic iallu" ::: "memory");
                     isb();
+                    dsbsy();
 
 
                     //NOTICE("tcr_el3  : 0x%zx -> 0x%zx\n", tcr_el3  , tcr_el1  );
@@ -373,6 +380,7 @@ certikos_el3_smc_handler(
                     cm_set_next_eret_context(NON_SECURE);
 
                     certkos_el3_swap_extra_regs(ctx);
+                    //NOTICE("done.\n");
 
                     SMC_RET0(ns_ctx);
                 }
