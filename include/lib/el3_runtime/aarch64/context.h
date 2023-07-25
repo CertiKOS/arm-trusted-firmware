@@ -407,7 +407,7 @@ DEFINE_REG_STRUCT(pauth, CTX_PAUTH_REGS_ALL);
  * structure at exception entry and exit. Each instance will
  * correspond to either the secure or the non-secure state.
  */
-typedef struct cpu_context {
+typedef struct __attribute__((aligned(64))) cpu_context  {
 	gp_regs_t gpregs_ctx;
 	el3_state_t el3state_ctx;
 	el1_sysregs_t el1_sysregs_ctx;

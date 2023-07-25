@@ -102,6 +102,10 @@ certikos_el3_fiq(uint32_t id, uint32_t flags, void *handle, void *cookie)
 static int32_t
 certikos_el3_boot_certikos(void)
 {
+    memset(cpu_ctx, 0, sizeof(cpu_ctx));
+    flush_dcache_range((uintptr_t)cpu_ctx, sizeof(cpu_ctx));
+    dsbsy();
+
     entry_point_info_t * certikos_ep = bl31_plat_get_next_image_ep_info(SECURE);
     certikos_el3_cpu_ctx * ctx = get_cpu_ctx();
 
@@ -152,7 +156,6 @@ certikos_el3_boot_certikos(void)
 
     certikos_el3_world_switch_return(&ctx->saved_sp);
 
-
     NOTICE("BL31: Booting Normal World\n");
     //entry_point_info_t* ns_ep = bl31_plat_get_next_image_ep_info(NON_SECURE);
     //assert(ns_ep != NULL);
@@ -201,9 +204,8 @@ certikos_el3_cpu_on_finish(u_register_t v)
         fpregs_context_restore(get_fpregs_ctx(cm_get_context(SECURE)));
         cm_set_next_eret_context(SECURE);
 
-        NOTICE("BL31: CertiKOS SCR=0x%llx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3
-));
-        NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
+        //NOTICE("BL31: CertiKOS SCR=0x%llx\n", read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3));
+        //NOTICE("BL31: CertiKOS PC=%p\n", (void*)core_ep.pc);
 
         uint64_t ret = certikos_el3_world_switch_return(&ctx->saved_sp);
         (void)(ret);

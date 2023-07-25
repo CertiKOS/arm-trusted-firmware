@@ -47,6 +47,9 @@ static entry_point_info_t bl32_image_ep_info;
 static entry_point_info_t bl33_image_ep_info;
 
 uintptr_t bl32_load_address = (uintptr_t)CERTIKOS_KERNEL_BIN_LINK_ADDR;
+size_t bl32_region_size = (size_t)CERTIKOS_REGION_SIZE;
+extern uint32_t certikos_kernel_size;
+
 
 /*******************************************************************************
  * Return a pointer to the 'entry_point_info' structure of the next image for
@@ -193,7 +196,7 @@ void bl31_plat_arch_setup(void)
 	mmap_add_region(0, 0, 4096, MT_NON_CACHEABLE | MT_RW | MT_SECURE);
 
     //RTH
-    NOTICE("Adding mmap region for CertiKOS kernel @%p\n", (void*)bl32_load_address);
+    NOTICE("Adding mmap region for CertiKOS kernel @%p (%u bytes)\n", (void*)bl32_load_address, certikos_kernel_size);
     mmap_add_region(bl32_load_address, bl32_load_address,
         16*1024*1024, MT_MEMORY | MT_RW | MT_SECURE);
 
@@ -219,7 +222,8 @@ static void rpi4_prepare_dtb(void)
 	if (fdt_check_header(dtb) != 0)
 		return;
 
-	ret = fdt_open_into(dtb, dtb, 0x100000);
+
+	ret = fdt_open_into(dtb, dtb, 4U << 20);
 	if (ret < 0) {
 		ERROR("Invalid Device Tree at %p: error %d\n", dtb, ret);
 		return;
@@ -248,6 +252,37 @@ static void rpi4_prepare_dtb(void)
 	offs = fdt_path_offset(dtb, "/chosen");
 	fdt_setprop_string(dtb, offs, "stdout-path", "serial0");
 
+
+    char node_name[256];
+    snprintf(node_name, sizeof(node_name), "certikos@%x",
+        (uint32_t)bl32_load_address);
+
+    NOTICE("Reserving CertiKOS Memory (%s -> %lx) in Device Tree...\n",
+        node_name, bl32_load_address+bl32_region_size);
+
+    ret = fdt_add_reserved_memory(dtb, node_name,
+        bl32_load_address, bl32_region_size);
+	if (ret < 0)
+    {
+        WARN("Failed to add CertiKOS reservation in device tree (%d: %s)\n",
+            ret, fdt_strerror(ret));
+    }
+
+    snprintf(node_name, sizeof(node_name), "thinros@%x",
+        (uint32_t)THINROS_PARTITION_ADDR);
+
+    NOTICE("Reserving ThinROS Memory (%s -> %llx) in Device Tree...\n",
+        node_name, (long long unsigned)THINROS_PARTITION_ADDR+THINROS_PARTITION_SIZE);
+
+    ret = fdt_add_reserved_memory(dtb, node_name,
+        THINROS_PARTITION_ADDR, THINROS_PARTITION_SIZE);
+	if (ret < 0)
+    {
+        WARN("Failed to add ThinROS reservation in device tree (%d: %s)\n",
+            ret, fdt_strerror(ret));
+    }
+
+
 	ret = fdt_pack(dtb);
 	if (ret < 0)
 		ERROR("Failed to pack Device Tree at %p: error %d\n", dtb, ret);
@@ -256,12 +291,6 @@ static void rpi4_prepare_dtb(void)
 	INFO("Changed device tree to advertise PSCI.\n");
 
 
-    NOTICE("Reserving CertiKOS Memory in Device Tree...\n");
-	NOTICE("Found %d mem reserve region(s)\n", fdt_num_mem_rsv(dtb));
-	if (fdt_add_reserved_memory(dtb, "CertiKOS@"  , bl32_load_address, 512*1024*1024))
-    {
-        WARN("Failed to add CertiKOS reservation in device tree (%d)\n", ret);
-    }
 }
 
 void bl31_platform_setup(void)
