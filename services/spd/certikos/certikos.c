@@ -280,10 +280,10 @@ certikos_el3_smc_handler(
             case SMC_FC64_NEW_VECTOR_TABLE:
                 {
                     //u_register_t asid_el3   = read_asid_el3();
-                    u_register_t vbar_el3   = read_vbar_el3();
+                    //u_register_t vbar_el3   = read_vbar_el3();
                     //u_register_t tcr_el3    = read_tcr_el3();
-                    u_register_t mair_el3   = read_mair_el3();
-                    u_register_t ttbr0_el3  = read_ttbr0_el3();
+                    //u_register_t mair_el3   = read_mair_el3();
+                    //u_register_t ttbr0_el3  = read_ttbr0_el3();
                     //u_register_t ttbr1_el3  = read_ttbr1_el3();
                     u_register_t sctlr_el3  = read_sctlr_el3();
 
@@ -293,34 +293,55 @@ certikos_el3_smc_handler(
                     u_register_t mair_el1   = read_mair_el1();
                     u_register_t ttbr0_el1  = read_ttbr0_el1();
                     //u_register_t ttbr1_el1  = read_ttbr1_el1();
-                    u_register_t sctlr_el1  = read_sctlr_el1();
+                    //u_register_t sctlr_el1  = read_sctlr_el1();
+                    //
 
-                    NOTICE("Disabling MMU...\n");
+                    flush_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
+                    flush_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
+
+                    //NOTICE("Disabling MMU...\n");
                     write_sctlr_el3(sctlr_el3 & ~(SCTLR_M_BIT));
 
-                    NOTICE("Swapping EL3 and EL1 Registers...\n");
+                    //NOTICE("Swapping EL3 and EL1 Registers...\n");
 
-                    NOTICE("vbar_el3 : 0x%zx -> 0x%zx\n", vbar_el3 , x4 );
+                    //NOTICE("vbar_el3 : 0x%zx -> 0x%zx\n", vbar_el3 , x4 );
                     write_vbar_el3(x4);
+                    isb();
 
-                    NOTICE("mair_el3 : 0x%zx -> 0x%zx\n", mair_el3 , mair_el1 );
+                    //NOTICE("mair_el3 : 0x%zx -> 0x%zx\n", mair_el3 , mair_el1 );
                     write_mair_el3(mair_el1);
+                    isb();
 
-                    NOTICE("ttbr0_el3: 0x%zx -> 0x%zx\n", ttbr0_el3, ttbr0_el1);
+                    //NOTICE("ttbr0_el3: 0x%zx -> 0x%zx\n", ttbr0_el3, ttbr0_el1);
                     write_ttbr0_el3(ttbr0_el1);
+                    isb();
 
-                    NOTICE("sctlr_el3: 0x%zx -> 0x%zx\n", sctlr_el3, sctlr_el1);
+                    //NOTICE("sctlr_el3: 0x%zx -> 0x%zx\n", sctlr_el3, sctlr_el1);
                     //write_sctlr_el3(sctlr_el1);
 
-                    NOTICE("Enabling MMU...\n");
+                    //size_t i;
+                    //for(i = 0; i < 1000*1000*plat_my_core_pos(); i++)
+                    //{
+                    //}
+                    //NOTICE("Enabling MMU...  %p\n", &i);
                     write_sctlr_el3(sctlr_el3
                         & ~(SCTLR_A_BIT | SCTLR_nAA_BIT | SCTLR_WXN_BIT));
+
+                    isb();
+                    dsbsy();
+                    tlbialle3();
+                    isb();
+                    inv_dcache_range((uintptr_t)ns_ctx, sizeof(cpu_context_t));
+                    inv_dcache_range((uintptr_t)ctx, sizeof(certikos_el3_cpu_ctx));
+                    asm volatile("ic iallu" ::: "memory");
+                    isb();
+                    dsbsy();
 
 
                     //NOTICE("tcr_el3  : 0x%zx -> 0x%zx\n", tcr_el3  , tcr_el1  );
                     //NOTICE("ttbr1_el3: %p -> %p\n", ttbr1_el3, ttbr1_el1);
 
-                    NOTICE("done!\n");
+
                     //while(1);
 
                     cm_el1_sysregs_context_save(SECURE);
