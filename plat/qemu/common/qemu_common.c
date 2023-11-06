@@ -45,6 +45,9 @@
 #define MAP_FLASH1	MAP_REGION_FLAT(QEMU_FLASH1_BASE, QEMU_FLASH1_SIZE, \
 					MT_MEMORY | MT_RO | MT_SECURE)
 
+#define MAP_DTB_MEM	MAP_REGION_FLAT(ARM_PRELOADED_DTB_BASE, 0x00100000,	\
+					MT_MEMORY | MT_RW | MT_SECURE)
+
 /*
  * Table of regions for various BL stages to map using the MMU.
  * This doesn't include TZRAM as the 'mem_layout' argument passed to
@@ -89,6 +92,7 @@ static const mmap_region_t plat_qemu_mmap[] = {
 #ifdef IMAGE_BL31
 static const mmap_region_t plat_qemu_mmap[] = {
 	MAP_SHARED_RAM,
+	MAP_DTB_MEM,
 	MAP_DEVICE0,
 #ifdef MAP_DEVICE1
 	MAP_DEVICE1,

@@ -9,6 +9,9 @@
 #include <common/bl_common.h>
 #include <drivers/arm/pl061_gpio.h>
 #include <plat/common/platform.h>
+#include <common/fdt_fixup.h>
+#include <common/fdt_wrappers.h>
+#include <libfdt.h>
 
 #include "qemu_private.h"
 
@@ -65,9 +68,9 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 void bl31_plat_arch_setup(void)
 {
 	qemu_configure_mmu_el3(BL31_BASE, (BL31_END - BL31_BASE),
-			      BL_CODE_BASE, BL_CODE_END,
-			      BL_RO_DATA_BASE, BL_RO_DATA_END,
-			      BL_COHERENT_RAM_BASE, BL_COHERENT_RAM_END);
+				  BL_CODE_BASE, BL_CODE_END,
+				  BL_RO_DATA_BASE, BL_RO_DATA_END,
+				  BL_COHERENT_RAM_BASE, BL_COHERENT_RAM_END);
 }
 
 static void qemu_gpio_init(void)
@@ -78,10 +81,79 @@ static void qemu_gpio_init(void)
 #endif
 }
 
+static void qemu_prepare_dtb(void)
+{
+	int ret;
+	void *dtb = (void *)ARM_PRELOADED_DTB_BASE;
+
+	/* Return if no device tree is detected */
+	if (fdt_check_header(dtb) != 0)
+		return;
+
+	ret = fdt_open_into(dtb, dtb, PLAT_QEMU_DT_MAX_SIZE);
+	if (ret < 0) {
+		ERROR("Invalid Device Tree at %p: error %d\n", dtb, ret);
+		return;
+	}
+
+
+	ret = fdt_open_into(dtb, dtb, 4U << 20);
+	if (ret < 0) {
+		ERROR("Invalid Device Tree at %p: error %d\n", dtb, ret);
+		return;
+	}
+
+
+	/* Reserve memory used by Trusted Firmware. */
+	if (fdt_add_reserved_memory(dtb, "atf@0", 0x0e000000, 0x0010000))
+		WARN("Failed to add reserved memory nodes to DT.\n");
+
+	uintptr_t bl32_load_address = 0x0e100000;
+	uintptr_t bl32_region_size = 0x20000000 - 0x0e100000;
+
+	char node_name[256];
+	snprintf(node_name, sizeof(node_name), "certikos@%x",
+	    (uint32_t)bl32_load_address);
+
+	NOTICE("Reserving CertiKOS Memory (%s -> %lx) in Device Tree...\n",
+		node_name, bl32_load_address+bl32_region_size);
+
+	ret = fdt_add_reserved_memory(dtb, node_name,
+		bl32_load_address, bl32_region_size);
+	if (ret < 0)
+	{
+		WARN("Failed to add CertiKOS reservation in device tree (%d: %s)\n",
+			ret, fdt_strerror(ret));
+	}
+
+//    snprintf(node_name, sizeof(node_name), "thinros@%x",
+//        (uint32_t)THINROS_PARTITION_ADDR);
+//
+//    NOTICE("Reserving ThinROS Memory (%s -> %llx) in Device Tree...\n",
+//        node_name, (long long unsigned)THINROS_PARTITION_ADDR+THINROS_PARTITION_SIZE);
+//
+//    ret = fdt_add_reserved_memory(dtb, node_name,
+//        THINROS_PARTITION_ADDR, THINROS_PARTITION_SIZE);
+//    if (ret < 0)
+//    {
+//        WARN("Failed to add ThinROS reservation in device tree (%d: %s)\n",
+//            ret, fdt_strerror(ret));
+//    }
+
+
+	ret = fdt_pack(dtb);
+	if (ret < 0)
+		ERROR("Failed to pack Device Tree at %p: error %d\n", dtb, ret);
+
+	clean_dcache_range((uintptr_t)dtb, fdt_blob_size(dtb));
+	INFO("Changed device tree to advertise PSCI.\n");
+}
+
 void bl31_platform_setup(void)
 {
 	plat_qemu_gic_init();
 	qemu_gpio_init();
+	qemu_prepare_dtb();
 }
 
 unsigned int plat_get_syscnt_freq2(void)
