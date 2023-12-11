@@ -268,21 +268,6 @@ static void rpi4_prepare_dtb(void)
             ret, fdt_strerror(ret));
     }
 
-    snprintf(node_name, sizeof(node_name), "thinros@%x",
-        (uint32_t)THINROS_PARTITION_ADDR);
-
-    NOTICE("Reserving ThinROS Memory (%s -> %llx) in Device Tree...\n",
-        node_name, (long long unsigned)THINROS_PARTITION_ADDR+THINROS_PARTITION_SIZE);
-
-    ret = fdt_add_reserved_memory(dtb, node_name,
-        THINROS_PARTITION_ADDR, THINROS_PARTITION_SIZE);
-	if (ret < 0)
-    {
-        WARN("Failed to add ThinROS reservation in device tree (%d: %s)\n",
-            ret, fdt_strerror(ret));
-    }
-
-
 	ret = fdt_pack(dtb);
 	if (ret < 0)
 		ERROR("Failed to pack Device Tree at %p: error %d\n", dtb, ret);
