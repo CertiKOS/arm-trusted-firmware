@@ -122,8 +122,8 @@
 #define PLAT_PHY_ADDR_SPACE_SIZE	(ULL(1) << 36)
 #define PLAT_VIRT_ADDR_SPACE_SIZE	(ULL(1) << 36)
 
-#define MAX_MMAP_REGIONS		8
-#define MAX_XLAT_TABLES			4
+#define MAX_MMAP_REGIONS		16
+#define MAX_XLAT_TABLES			16
 
 #define MAX_IO_DEVICES			U(3)
 #define MAX_IO_HANDLES			U(4)
